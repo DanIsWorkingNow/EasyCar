@@ -11,6 +11,7 @@ class CarController extends Controller
     /**
      * Display a listing of the resource.
      */
+    
     public function index(Request $request)
     {
         $branches = Branch::all();
