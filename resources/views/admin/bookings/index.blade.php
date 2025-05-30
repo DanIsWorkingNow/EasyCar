@@ -262,7 +262,10 @@
             </div>
             <form id="rejectForm" method="POST">
                 @csrf
+<<<<<<< HEAD
                 @method('PATCH')
+=======
+>>>>>>> 0f0e6c5985446ea0016f9f3e01473c3750a5cb33
                 <div class="modal-body">
                     <p>Are you sure you want to reject this booking?</p>
                     <div class="mb-3">
