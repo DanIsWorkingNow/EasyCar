@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-    $table->tinyInteger('userLevel')->default(0); // 0 = normal, 1 = staff, 5 = admin
+   if (!Schema::hasColumn('users', 'userLevel')) {
+    $table->tinyInteger('userLevel')->default(0);
+}
+
 });
 
     }

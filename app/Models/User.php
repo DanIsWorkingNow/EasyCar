@@ -50,4 +50,11 @@ class User extends Authenticatable
     return $this->hasMany(Booking::class);
 }
 
+// app/Models/User.php
+public function branch()
+{
+    return $this->belongsTo(Branch::class);
+}
+
+
 }

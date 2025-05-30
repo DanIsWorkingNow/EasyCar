@@ -18,6 +18,7 @@ return new class extends Migration
         $table->date('rental_start');
         $table->date('rental_end');
         $table->timestamps();
+        $table->unsignedInteger('total_days')->default(1);
     });
     }
 

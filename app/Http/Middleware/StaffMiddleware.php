@@ -14,11 +14,10 @@ class StaffMiddleware
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle($request, Closure $next)
-{
-    if (auth()->check() && auth()->user()->role === 'staff') {
-        return $next($request);
+    {
+        if (auth()->check() && auth()->user()->userLevel == 1) {
+            return $next($request);
+        }
+        abort(403, 'Unauthorized');
     }
-    abort(403);
-}
-
 }
