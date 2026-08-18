@@ -63,15 +63,14 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-
-        // spatie/laravel-permission v8 no longer auto-registers these aliases
-        // for apps still using the legacy Kernel.php structure (it assumes
-        // Laravel 11+'s bootstrap/app.php withMiddleware() convention) — see
-        // vendor/spatie/laravel-permission/src/PermissionServiceProvider.php.
-        // Registered by hand so routes/web.php's 'role:admin'/'role:staff'
-        // resolve instead of throwing "Target class [role] does not exist."
-        'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-        'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-        'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
     ];
+
+    // NOTE: this entire file is not actually loaded — bootstrap/app.php uses
+    // Laravel 11+'s Application::configure()->withMiddleware() style, which
+    // never instantiates App\Http\Kernel. Middleware aliases must be
+    // registered in bootstrap/app.php's withMiddleware() closure (or, as
+    // AppServiceProvider::boot() already did for the old 'admin'/'staff'
+    // aliases, via a direct $router->aliasMiddleware() call). Confirmed by
+    // debugging "Target class [role] does not exist." — adding 'role' here
+    // had no effect; see bootstrap/app.php for the actual fix.
 }
