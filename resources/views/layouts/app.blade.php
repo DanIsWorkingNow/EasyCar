@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
@@ -8,6 +8,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'Laravel') }}</title>
+
+    <!-- Bootstrap CSS (was missing — this is why .row/.col-* and d-flex/d-none utilities weren't working) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Fonts -->
     <link rel="dns-prefetch" href="//fonts.bunny.net">
@@ -106,6 +109,43 @@
             min-height: calc(100vh - 100px);
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         }
+
+        /* Shared compact dashboard components (stat cards + quick action buttons) */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+        .stat-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 1.25rem;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border-top: 4px solid var(--accent, #667eea);
+    overflow: hidden;
+}
+        
+        .stat-card .icon  { font-size: 1.75rem; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 800; color: #667eea; margin: .25rem 0; }
+        .stat-card .label { font-size: .9rem; color: #6b7280; font-weight: 600; }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: .75rem;
+        }
+        .action-btn {
+            display: block;
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform .15s ease;
+        }
+        .action-btn:hover { transform: translateY(-2px); }
     </style>
 </head>
 
