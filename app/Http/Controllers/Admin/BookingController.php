@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Response;
 
 class BookingController extends Controller
 {
@@ -191,8 +190,7 @@ class BookingController extends Controller
                                           ->count(),
             'revenue_this_month' => Booking::approved()
                                           ->whereMonth('created_at', now()->month)
-                                          ->get()
-                                          ->sum('total_cost')
+                                          ->sum('total_price')
         ];
     }
 
@@ -200,20 +198,26 @@ class BookingController extends Controller
     public function export()
 {
     $bookings = Booking::with('user', 'cars')->get();
+    $filename = 'bookings_export_' . now()->format('Ymd_His') . '.csv';
 
-    $csvData = "Booking ID,Customer Name,Start Date,End Date,Status,Car(s)\n";
+    return response()->streamDownload(function () use ($bookings) {
+        $handle = fopen('php://output', 'w');
+        fputcsv($handle, ['Booking ID', 'Customer Name', 'Start Date', 'End Date', 'Status', 'Car(s)']);
 
-    foreach ($bookings as $booking) {
-        $cars = $booking->cars->map(fn($car) => $car->brand . ' ' . $car->model)->join('; ');
-        $csvData .= "{$booking->id},{$booking->user->name},{$booking->start_date},{$booking->end_date},{$booking->status},\"{$cars}\"\n";
-    }
+        foreach ($bookings as $booking) {
+            $cars = $booking->cars->map(fn ($car) => "{$car->brand} {$car->model}")->implode('; ');
+            fputcsv($handle, [
+                $booking->id,
+                $booking->user->name,
+                $booking->start_date,
+                $booking->end_date,
+                $booking->status,
+                $cars,
+            ]);
+        }
 
-    $filename = "bookings_export_" . now()->format('Ymd_His') . ".csv";
-
-    return Response::make($csvData, 200, [
-        'Content-Type' => 'text/csv',
-        'Content-Disposition' => "attachment; filename=\"$filename\"",
-    ]);
+        fclose($handle);
+    }, $filename, ['Content-Type' => 'text/csv']);
 }
 
     /**

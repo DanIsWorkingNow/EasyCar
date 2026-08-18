@@ -27,6 +27,11 @@
         </div>
 
         <div class="mb-4">
+            <label for="price_per_day" class="block font-semibold">Price per Day (RM):</label>
+            <input type="number" step="0.01" min="0.01" id="price_per_day" name="price_per_day" class="w-full border rounded p-2" value="{{ old('price_per_day') }}" required>
+        </div>
+
+        <div class="mb-4">
             <label for="branch_id" class="block font-semibold">Branch:</label>
             <select name="branch_id" id="branch_id" class="w-full border rounded p-2" required>
                 <!-- Assuming you have branches in the database -->

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Car;
 use App\Models\Branch;
+use App\Services\BookingAvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,10 +18,6 @@ class BookingController extends Controller
      */
     public function index()
     {
-          // Eager load the 'cars' relationship
-    $bookings = Booking::with('cars')->where('user_id', auth()->id())->get();
-    
-    return view('bookings.index', compact('bookings'));
         try {
             $bookings = Booking::with(['cars', 'cars.branch'])
                 ->where('user_id', auth()->id())
@@ -65,23 +62,9 @@ class BookingController extends Controller
             
             // If dates are provided, filter out unavailable cars
             if ($request->has('start_date') && $request->has('end_date')) {
-                $startDate = $request->start_date;
-                $endDate = $request->end_date;
-                
-                $unavailableCarIds = DB::table('car_booking')
-                    ->join('bookings', 'bookings.id', '=', 'car_booking.booking_id')
-                    ->whereNull('bookings.deleted_at') // Only consider non-cancelled bookings
-                    ->where(function ($query) use ($startDate, $endDate) {
-                        $query->whereBetween('rental_start', [$startDate, $endDate])
-                              ->orWhereBetween('rental_end', [$startDate, $endDate])
-                              ->orWhere(function ($q) use ($startDate, $endDate) {
-                                  $q->where('rental_start', '<=', $startDate)
-                                    ->where('rental_end', '>=', $endDate);
-                              });
-                    })
-                    ->pluck('car_id')
-                    ->toArray();
-                
+                $unavailableCarIds = app(BookingAvailabilityService::class)
+                    ->unavailableCarIds($request->start_date, $request->end_date);
+
                 if (!empty($unavailableCarIds)) {
                     $carsQuery->whereNotIn('id', $unavailableCarIds);
                 }
@@ -154,20 +137,9 @@ class BookingController extends Controller
         }
 
         // Check for car availability conflicts
+        $availability = app(BookingAvailabilityService::class);
         foreach ($request->cars as $car_id) {
-            $conflict = DB::table('car_booking')
-                ->join('bookings', 'bookings.id', '=', 'car_booking.booking_id')
-                ->whereNull('bookings.deleted_at') // Only check non-cancelled bookings
-                ->where('car_id', $car_id)
-                ->where(function ($query) use ($request) {
-                    $query->whereBetween('rental_start', [$request->start_date, $request->end_date])
-                          ->orWhereBetween('rental_end', [$request->start_date, $request->end_date])
-                          ->orWhere(function ($q) use ($request) {
-                              $q->where('rental_start', '<=', $request->start_date)
-                                ->where('rental_end', '>=', $request->end_date);
-                          });
-                })
-                ->exists();
+            $conflict = $availability->hasConflict($car_id, $request->start_date, $request->end_date);
 
             if ($conflict) {
                 $car = Car::find($car_id);
@@ -232,10 +204,6 @@ class BookingController extends Controller
      */
     public function show(Booking $booking)
     {
-         // Eager load the 'cars' relationship
-    $bookings = Booking::with('cars')->where('user_id', auth()->id())->get();
-    
-    return view('bookings.index', compact('bookings'));
         try {
             // Ensure user can only view their own bookings
             if ($booking->user_id !== auth()->id()) {
@@ -320,21 +288,9 @@ class BookingController extends Controller
 
 
             // Check for conflicts (excluding current booking)
+            $availability = app(BookingAvailabilityService::class);
             foreach ($request->cars as $car_id) {
-                $conflict = DB::table('car_booking')
-                    ->join('bookings', 'bookings.id', '=', 'car_booking.booking_id')
-                    ->whereNull('bookings.deleted_at')
-                    ->where('car_id', $car_id)
-                    ->where('bookings.id', '!=', $booking->id) // Exclude current booking
-                    ->where(function ($query) use ($request) {
-                        $query->whereBetween('rental_start', [$request->start_date, $request->end_date])
-                              ->orWhereBetween('rental_end', [$request->start_date, $request->end_date])
-                              ->orWhere(function ($q) use ($request) {
-                                  $q->where('rental_start', '<=', $request->start_date)
-                                    ->where('rental_end', '>=', $request->end_date);
-                              });
-                    })
-                    ->exists();
+                $conflict = $availability->hasConflict($car_id, $request->start_date, $request->end_date, $booking->id);
 
                 if ($conflict) {
                     $car = Car::find($car_id);
@@ -438,19 +394,8 @@ class BookingController extends Controller
             }
 
             // Filter out unavailable cars
-            $unavailableCarIds = DB::table('car_booking')
-                ->join('bookings', 'bookings.id', '=', 'car_booking.booking_id')
-                ->whereNull('bookings.deleted_at')
-                ->where(function ($query) use ($request) {
-                    $query->whereBetween('rental_start', [$request->start_date, $request->end_date])
-                          ->orWhereBetween('rental_end', [$request->start_date, $request->end_date])
-                          ->orWhere(function ($q) use ($request) {
-                              $q->where('rental_start', '<=', $request->start_date)
-                                ->where('rental_end', '>=', $request->end_date);
-                          });
-                })
-                ->pluck('car_id')
-                ->toArray();
+            $unavailableCarIds = app(BookingAvailabilityService::class)
+                ->unavailableCarIds($request->start_date, $request->end_date);
 
             if (!empty($unavailableCarIds)) {
                 $carsQuery->whereNotIn('id', $unavailableCarIds);

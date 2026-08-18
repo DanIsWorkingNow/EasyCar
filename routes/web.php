@@ -89,6 +89,11 @@ Route::middleware(['auth', 'staff'])->prefix('staff')->group(function () {
         'update' => 'staff.bookings.update',
         'destroy' => 'staff.bookings.destroy'
     ]);
+
+    // Staff booking approval (TD-20) — mirrors the admin approve/reject/bulk-approve routes
+    Route::post('/bookings/bulk-approve', [StaffBookingController::class, 'bulkApprove'])->name('staff.bookings.bulk-approve');
+    Route::patch('/bookings/{booking}/approve', [StaffBookingController::class, 'approve'])->name('staff.bookings.approve');
+    Route::patch('/bookings/{booking}/reject', [StaffBookingController::class, 'reject'])->name('staff.bookings.reject');
 });
 
 Route::get('/test-admin', function () {

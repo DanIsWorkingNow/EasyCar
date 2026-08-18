@@ -2,15 +2,27 @@
 
 namespace App\Models;
 
+use App\Services\BookingAvailabilityService;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Carbon\Carbon;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * FIX (TD-17): this model previously did not use SoftDeletes, even though a
+ * migration adds a deleted_at column to bookings and multiple queries across
+ * the codebase (whereNull('bookings.deleted_at')) assume soft-deleted rows
+ * persist. Without the trait, BookingController::destroy()'s $booking->delete()
+ * was a HARD delete — and because car_booking.booking_id cascades on delete,
+ * cancelling a booking permanently destroyed the booking and its car_booking
+ * rows with no record they ever existed. Adding SoftDeletes here fixes that:
+ * cancellation is now recoverable and auditable.
+ */
 class Booking extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -22,56 +34,43 @@ class Booking extends Model
         'approved_at',
         'approval_notes',
         'rejection_reason',
-        'total_price', 
+        'total_price',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
-        'approved_at' => 'datetime'
+        'approved_at' => 'datetime',
     ];
 
-    /**
-     * Get the user who made the booking
-     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Get the admin who approved/rejected the booking
-     */
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    /**
-     * Get the cars associated with this booking
-     */
     public function cars(): BelongsToMany
-{
-    return $this->belongsToMany(Car::class, 'car_booking') // your pivot table name
-                ->withPivot('quantity', 'price')
-                ->withTimestamps();
-}
-
-public function calculateTotalPrice()
-{
-    $total = 0;
-    foreach ($this->cars as $car) {
-        $total += $car->pivot->price;
+    {
+        return $this->belongsToMany(Car::class, 'car_booking')
+            ->withPivot('quantity', 'price')
+            ->withTimestamps();
     }
-    return $total;
-}
-
-
-
 
     /**
-     * Status helper methods
+     * FIX (TD-03): total_price is the single source of truth, computed once
+     * and stored at booking creation/edit time. This replaces the three
+     * separate totals that previously coexisted here and could disagree
+     * (calculateTotalPrice(), getTotalCostAttribute(), calculateTotalCost()).
      */
+    public function calculateTotalPrice(): float
+    {
+        return (float) $this->cars->sum(fn ($car) => $car->pivot->price ?? 0);
+    }
+
     public function isPending(): bool
     {
         return $this->status === 'pending';
@@ -97,9 +96,6 @@ public function calculateTotalPrice()
         return $this->status === 'cancelled';
     }
 
-    /**
-     * Get status badge HTML for display
-     */
     public function getStatusBadgeAttribute(): string
     {
         $badges = [
@@ -107,69 +103,75 @@ public function calculateTotalPrice()
             'approved' => '<span class="badge bg-success">✅ Approved</span>',
             'rejected' => '<span class="badge bg-danger">❌ Rejected</span>',
             'completed' => '<span class="badge bg-primary">🎉 Completed</span>',
-            'cancelled' => '<span class="badge bg-secondary">🚫 Cancelled</span>'
+            'cancelled' => '<span class="badge bg-secondary">🚫 Cancelled</span>',
         ];
 
         return $badges[$this->status] ?? '<span class="badge bg-light text-dark">Unknown</span>';
     }
 
-    /**
-     * Get formatted booking period
-     */
     public function getBookingPeriodAttribute(): string
     {
         return $this->start_date->format('M d, Y') . ' - ' . $this->end_date->format('M d, Y');
     }
 
-    /**
-     * Get days until booking starts
-     */
     public function getDaysUntilStartAttribute(): int
     {
         return max(0, Carbon::now()->diffInDays($this->start_date, false));
     }
 
-    /**
-     * Check if booking can be approved
-     */
     public function canBeApproved(): bool
     {
         return $this->isPending() && $this->days_until_start >= 2;
     }
 
-    /**
-     * Check if booking can be rejected
-     */
     public function canBeRejected(): bool
     {
         return $this->isPending();
     }
 
     /**
-     * Approve the booking
+     * FIX (TD-04): every attached car's availability is now re-checked at
+     * the moment of approval — not only at booking creation — closing the
+     * race condition where two overlapping pending bookings for the same
+     * car could both previously be approved. Because this check lives here
+     * rather than in each caller, Admin\BookingController's and
+     * Staff\BookingController's approve()/reject()/bulkApprove() all get
+     * the fix automatically.
      */
-    public function approve(User $admin, string $notes = null): bool
+    public function approve(User $admin, ?string $notes = null): bool
     {
-        if (!$this->canBeApproved()) {
+        if (! $this->canBeApproved()) {
             return false;
+        }
+
+        $availability = app(BookingAvailabilityService::class);
+
+        foreach ($this->cars as $car) {
+            $conflict = $availability->hasApprovedConflict(
+                $car->id,
+                $this->start_date->toDateString(),
+                $this->end_date->toDateString(),
+                $this->id
+            );
+
+            if ($conflict) {
+                return false;
+            }
         }
 
         $this->update([
             'status' => 'approved',
             'approved_by' => $admin->id,
             'approved_at' => now(),
-            'approval_notes' => $notes
+            'approval_notes' => $notes,
         ]);
 
         return true;
     }
 
-    /**
-     * Reject the booking
-     */
     public function reject(User $admin, string $reason): bool
     {
-        if (!$this->canBeRejected()) {
+        if (! $this->canBeRejected()) {
             return false;
         }
 
@@ -177,60 +179,24 @@ public function calculateTotalPrice()
             'status' => 'rejected',
             'approved_by' => $admin->id,
             'approved_at' => now(),
-            'rejection_reason' => $reason
+            'rejection_reason' => $reason,
         ]);
 
         return true;
     }
 
-    /**
-     * Get total booking cost (you'll need to implement this based on your pricing logic)
-     */
-    public function getTotalCostAttribute(): float
-{
-    $totalCost = 0;
-    foreach ($this->cars as $car) {
-        // Use the price stored in the pivot table for this car in the booking
-        $totalCost += $car->pivot->price ?? 0;
-    }
-    return $totalCost;
-}
-
-public function calculateTotalCost(): float
-{
-    return $this->cars->sum(function($car) {
-        return $car->pivot->price ?? 0;
-    });
-}
-
-
-
-
-    /**
-     * Scope for filtering bookings by status
-     */
     public function scopeByStatus($query, string $status)
     {
         return $query->where('status', $status);
     }
 
-    /**
-     * Scope for pending bookings
-     */
     public function scopePending($query)
     {
         return $query->where('status', 'pending');
     }
 
-    /**
-     * Scope for approved bookings
-     */
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');
     }
-
-
-
-
 }

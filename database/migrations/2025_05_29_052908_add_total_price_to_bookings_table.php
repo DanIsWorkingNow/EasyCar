@@ -12,7 +12,7 @@ return new class extends Migration
 public function up()
 {
     Schema::table('bookings', function (Blueprint $table) {
-        $table->decimal('total_price', 10, 2)->default(0)->after('some_existing_column');
+        $table->decimal('total_price', 10, 2)->default(0)->after('rejection_reason');
     });
 }
 
