@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\BookingAvailabilityService;
+use App\Services\DashboardService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,14 +12,28 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * FIX (TD-17): this model previously did not use SoftDeletes, even though a
- * migration adds a deleted_at column to bookings and multiple queries across
- * the codebase (whereNull('bookings.deleted_at')) assume soft-deleted rows
- * persist. Without the trait, BookingController::destroy()'s $booking->delete()
- * was a HARD delete — and because car_booking.booking_id cascades on delete,
- * cancelling a booking permanently destroyed the booking and its car_booking
- * rows with no record they ever existed. Adding SoftDeletes here fixes that:
- * cancellation is now recoverable and auditable.
+ * FIX (TD-17): SoftDeletes — deleted_at is queried everywhere
+ * (whereNull('bookings.deleted_at')) but was never actually populated
+ * without this trait; cancelling a booking used to hard-delete it.
+ *
+ * FIX (TD-03): total_price is the single source of truth (see
+ * calculateTotalPrice()), replacing three previously-disagreeing methods.
+ *
+ * FIX (TD-04): approve() re-checks car availability at the moment of
+ * approval, not only at booking creation — closing the race condition
+ * where two overlapping pending bookings for the same car could both
+ * previously be approved. It deliberately calls hasApprovedConflict()
+ * rather than the general-purpose hasConflict(): two competing *pending*
+ * bookings for the same car/dates must be allowed to coexist (that's the
+ * whole scenario this re-check exists to arbitrate), so only an already-
+ * *approved* booking should count as a blocker here. Using hasConflict()
+ * instead would make every pending booking block every other pending
+ * booking's approval — including the very first one — which defeats the
+ * fix (caught by tests/Feature/BookingConflictTest.php's regression case).
+ *
+ * NEW (Level 2, TSD 5.6): approve()/reject() clear the relevant dashboard
+ * cache keys so an action taken by one staff member shows up for everyone
+ * else within the poll interval rather than waiting out the cache TTL.
  */
 class Booking extends Model
 {
@@ -60,12 +75,6 @@ class Booking extends Model
             ->withTimestamps();
     }
 
-    /**
-     * FIX (TD-03): total_price is the single source of truth, computed once
-     * and stored at booking creation/edit time. This replaces the three
-     * separate totals that previously coexisted here and could disagree
-     * (calculateTotalPrice(), getTotalCostAttribute(), calculateTotalCost()).
-     */
     public function calculateTotalPrice(): float
     {
         return (float) $this->cars->sum(fn ($car) => $car->pivot->price ?? 0);
@@ -129,15 +138,6 @@ class Booking extends Model
         return $this->isPending();
     }
 
-    /**
-     * FIX (TD-04): every attached car's availability is now re-checked at
-     * the moment of approval — not only at booking creation — closing the
-     * race condition where two overlapping pending bookings for the same
-     * car could both previously be approved. Because this check lives here
-     * rather than in each caller, Admin\BookingController's and
-     * Staff\BookingController's approve()/reject()/bulkApprove() all get
-     * the fix automatically.
-     */
     public function approve(User $admin, ?string $notes = null): bool
     {
         if (! $this->canBeApproved()) {
@@ -166,6 +166,8 @@ class Booking extends Model
             'approval_notes' => $notes,
         ]);
 
+        $this->forgetDashboardCache();
+
         return true;
     }
 
@@ -182,7 +184,27 @@ class Booking extends Model
             'rejection_reason' => $reason,
         ]);
 
+        $this->forgetDashboardCache();
+
         return true;
+    }
+
+    /**
+     * Invalidates the dashboard's cached KPIs for every branch this booking
+     * touches, so an approval/rejection is reflected the moment it happens
+     * rather than waiting out the cache TTL.
+     */
+    private function forgetDashboardCache(): void
+    {
+        $this->loadMissing('cars');
+
+        $branchIds = $this->cars->pluck('branch_id')->unique();
+
+        DashboardService::forgetCacheFor(null); // the "all branches" admin view
+
+        foreach ($branchIds as $branchId) {
+            DashboardService::forgetCacheFor($branchId);
+        }
     }
 
     public function scopeByStatus($query, string $status)

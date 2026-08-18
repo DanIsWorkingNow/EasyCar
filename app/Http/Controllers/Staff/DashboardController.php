@@ -3,25 +3,16 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\Car;
-use Illuminate\Support\Facades\Auth;
 
+/**
+ * REPLACED for Level 2 — see the comment in Admin\DashboardController.
+ * The branch-scoping that used to live here (Auth::user()->branch_id) now
+ * happens inside Livewire\Dashboard\DashboardIndex::mount().
+ */
 class DashboardController extends Controller
 {
     public function index()
     {
-        $branchId = Auth::user()->branch_id;
-
-        $cars = Car::where('branch_id', $branchId)->count();
-
-        $bookings = Booking::whereHas('cars', function ($q) use ($branchId) {
-            $q->where('branch_id', $branchId);
-        })->count();
-
-        return view('staff.dashboard', [
-            'totalCars' => $cars,
-            'totalBookings' => $bookings,
-        ]);
+        return view('staff.dashboard');
     }
 }

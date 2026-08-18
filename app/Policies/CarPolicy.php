@@ -4,60 +4,53 @@ namespace App\Policies;
 
 use App\Models\Car;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
+/**
+ * FIXED (TD-16). The original CarPolicy was registered in
+ * AuthServiceProvider but never actually invoked by any controller —
+ * viewAny()/view() unconditionally returned false, and create()/update()
+ * duplicated (inconsistently) the middleware's userLevel checks. This
+ * version is backed by the Spatie permission model, and is safe to
+ * actually wire up with $this->authorize() calls.
+ */
 class CarPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
     public function viewAny(User $user): bool
     {
-        return false;
+        return true; // browsing the fleet is fine for any authenticated user
     }
 
-    /**
-     * Determine whether the user can view the model.
-     */
     public function view(User $user, Car $car): bool
     {
-        return false;
+        return true;
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
-  public function create(User $user)
-{
-    return $user->userLevel === 5; // only admin
-}
+    public function create(User $user): bool
+    {
+        return $user->hasRole('admin') && $user->can('manage-fleet');
+    }
 
-public function update(User $user, Car $car)
-{
-    return $user->userLevel >= 1; // staff or admin
-}
+    public function update(User $user, Car $car): bool
+    {
+        if (! $user->can('manage-fleet')) {
+            return false;
+        }
 
-    /**
-     * Determine whether the user can delete the model.
-     */
+        return $user->hasRole('admin') || $car->branch_id === $user->branch_id;
+    }
+
     public function delete(User $user, Car $car): bool
     {
-        return false;
+        return $user->hasRole('admin');
     }
 
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, Car $car): bool
     {
-        return false;
+        return $user->hasRole('admin');
     }
 
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, Car $car): bool
     {
-        return false;
+        return $user->hasRole('admin');
     }
 }

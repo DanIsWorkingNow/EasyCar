@@ -2,31 +2,32 @@
 
 namespace App\Providers;
 
+use App\Models\Booking;
+use App\Models\Car;
+use App\Policies\BookingPolicy;
+use App\Policies\CarPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
-use App\Models\User;
-use App\Models\Car;
-use App\Policies\CarPolicy;
 
+/**
+ * CUTOVER (TSD 4.4 step 3). Changes from the original:
+ *  - Removed Gate::define('is-admin', ...) / Gate::define('is-staff', ...):
+ *    replaced by role:admin / role:staff route middleware (Spatie) in
+ *    routes/web.php, and by the Policy classes below for anything needing
+ *    per-resource / per-branch logic.
+ *  - Registered BookingPolicy alongside the fixed CarPolicy.
+ *  - Added Gate::before() so the 'admin' role automatically passes every
+ *    permission check without needing each new permission hand-added to it.
+ */
 class AuthServiceProvider extends ServiceProvider
 {
-    /**
-     * The policy mappings for the application.
-     *
-     * @var array
-     */
     protected $policies = [
-       Car::class => CarPolicy::class,
+        Car::class => CarPolicy::class,
+        Booking::class => BookingPolicy::class,
     ];
 
-    /**
-     * Register any authentication / authorization services.
-     */
-   
-
-    public function boot()
-{
-    Gate::define('is-admin', fn ($user) => $user->userLevel === 5);
-    Gate::define('is-staff', fn ($user) => $user->userLevel === 1);
-}
+    public function boot(): void
+    {
+        Gate::before(fn ($user, $ability) => $user->hasRole('admin') ? true : null);
+    }
 }

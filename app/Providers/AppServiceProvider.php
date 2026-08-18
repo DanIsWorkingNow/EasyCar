@@ -19,9 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-       // Register middleware
-    $router = $this->app['router'];
-    $router->aliasMiddleware('admin', \App\Http\Middleware\AdminMiddleware::class);
-    $router->aliasMiddleware('staff', \App\Http\Middleware\StaffMiddleware::class); //
+        // The 'admin'/'staff' middleware aliases previously registered here
+        // (TD-06) are gone — routes now use Spatie's 'role:admin'/'role:staff'
+        // middleware, registered automatically by the package.
     }
 }

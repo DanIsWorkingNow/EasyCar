@@ -63,7 +63,15 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        'admin' => \App\Http\Middleware\AdminMiddleware::class,
-        'staff' => \App\Http\Middleware\StaffMiddleware::class,
+
+        // spatie/laravel-permission v8 no longer auto-registers these aliases
+        // for apps still using the legacy Kernel.php structure (it assumes
+        // Laravel 11+'s bootstrap/app.php withMiddleware() convention) — see
+        // vendor/spatie/laravel-permission/src/PermissionServiceProvider.php.
+        // Registered by hand so routes/web.php's 'role:admin'/'role:staff'
+        // resolve instead of throwing "Target class [role] does not exist."
+        'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+        'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+        'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
     ];
 }

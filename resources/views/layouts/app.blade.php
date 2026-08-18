@@ -19,6 +19,7 @@
 
     @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @livewireStyles
 
     <style>
         /* Custom Navbar Styles */
@@ -157,13 +158,13 @@
                 <a href="{{ url('/') }}" class="nav-btn home-btn">Home</a>
 
                 @auth
-                    @can('is-admin')
+                    @role('admin')
                         <a href="{{ route('admin.dashboard') }}" class="nav-btn">Admin</a>
-                    @endcan
+                    @endrole
 
-                    @can('is-staff')
+                    @role('staff')
                         <a href="{{ route('staff.dashboard') }}" class="nav-btn">Staff</a>
-                    @endcan
+                    @endrole
 
                     <a href="{{ url('/bookings') }}" class="nav-btn">My Bookings</a>
                     <a href="{{ url('/cars') }}" class="nav-btn">Browse Cars</a>
@@ -196,5 +197,6 @@
 
     <!-- Bootstrap JS (optional) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    @livewireScripts
 </body>
 </html>
