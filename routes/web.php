@@ -66,10 +66,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
         'destroy' => 'admin.users.destroy'
     ]);
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 0f0e6c5985446ea0016f9f3e01473c3750a5cb33
 });
 
 // STAFF ROUTES
