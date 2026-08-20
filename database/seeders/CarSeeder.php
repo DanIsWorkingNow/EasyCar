@@ -2,12 +2,8 @@
 
 namespace Database\Seeders;
 
-
-use Illuminate\Database\Seeder;
 use App\Models\Car;
-use App\Models\Branch;
-
-
+use Illuminate\Database\Seeder;
 
 class CarSeeder extends Seeder
 {

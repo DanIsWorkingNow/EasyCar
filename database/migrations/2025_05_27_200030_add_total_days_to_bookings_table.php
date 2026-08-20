@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            if (!Schema::hasColumn('bookings', 'total_days')) {
+            if (! Schema::hasColumn('bookings', 'total_days')) {
                 $table->unsignedInteger('total_days')->default(1)->after('end_date');
             }
         });

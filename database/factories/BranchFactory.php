@@ -12,7 +12,7 @@ class BranchFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->randomElement(['Bandar Baru Bangi', 'Shah Alam', 'Gombak']) . ' ' . fake()->unique()->numberBetween(1, 9999),
+            'name' => fake()->randomElement(['Bandar Baru Bangi', 'Shah Alam', 'Gombak']).' '.fake()->unique()->numberBetween(1, 9999),
         ];
     }
 }

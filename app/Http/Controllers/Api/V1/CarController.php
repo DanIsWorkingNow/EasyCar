@@ -27,7 +27,7 @@ class CarController extends Controller
             ->when($request->filled('transmission'), fn ($q) => $q->where('transmission', $request->transmission))
             ->when($request->filled('brand'), function ($q) use ($request) {
                 // Portable case-insensitive match (TSD DB-03) — works on MySQL, SQLite, and PostgreSQL alike.
-                $q->whereRaw('LOWER(brand) LIKE ?', ['%' . strtolower($request->brand) . '%']);
+                $q->whereRaw('LOWER(brand) LIKE ?', ['%'.strtolower($request->brand).'%']);
             })
             ->paginate(20);
 

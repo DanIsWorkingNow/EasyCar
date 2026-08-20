@@ -3,14 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
-use App\Models\Car;
 use App\Models\Branch;
+use App\Models\Car;
 use App\Notifications\BookingConfirmed;
 use App\Services\BookingAvailabilityService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class BookingController extends Controller
 {
@@ -27,7 +27,8 @@ class BookingController extends Controller
 
             return view('bookings.index', compact('bookings'));
         } catch (\Exception $e) {
-            Log::error('Booking index error: ' . $e->getMessage());
+            Log::error('Booking index error: '.$e->getMessage());
+
             return redirect()->back()->withErrors(['error' => 'Unable to load bookings. Please try again.']);
         }
     }
@@ -40,42 +41,43 @@ class BookingController extends Controller
         try {
             // Get all branches for filtering
             $branches = Branch::orderBy('name')->get();
-            
+
             // Start with all cars with their branch relationships
             $carsQuery = Car::with('branch');
-            
+
             // Apply filters if provided
             if ($request->has('branch_id') && $request->branch_id) {
                 $carsQuery->where('branch_id', $request->branch_id);
             }
-            
+
             if ($request->has('transmission') && $request->transmission) {
                 $carsQuery->where('transmission', $request->transmission);
             }
-            
+
             if ($request->has('type') && $request->type) {
                 $carsQuery->where('type', $request->type);
             }
-            
+
             if ($request->has('brand') && $request->brand) {
-                $carsQuery->where('brand', 'like', '%' . $request->brand . '%');
+                $carsQuery->where('brand', 'like', '%'.$request->brand.'%');
             }
-            
+
             // If dates are provided, filter out unavailable cars
             if ($request->has('start_date') && $request->has('end_date')) {
                 $unavailableCarIds = app(BookingAvailabilityService::class)
                     ->unavailableCarIds($request->start_date, $request->end_date);
 
-                if (!empty($unavailableCarIds)) {
+                if (! empty($unavailableCarIds)) {
                     $carsQuery->whereNotIn('id', $unavailableCarIds);
                 }
             }
-            
+
             $cars = $carsQuery->orderBy('brand')->orderBy('model')->get();
-            
+
             return view('bookings.create', compact('cars', 'branches'));
         } catch (\Exception $e) {
-            Log::error('Booking create form error: ' . $e->getMessage());
+            Log::error('Booking create form error: '.$e->getMessage());
+
             return redirect()->route('bookings.index')->withErrors(['error' => 'Unable to load booking form. Please try again.']);
         }
     }
@@ -83,125 +85,126 @@ class BookingController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request) 
-{
-    try {
-        $request->validate([
-            'start_date' => [
-                'required',
-                'date',
-                'after_or_equal:' . now()->addDays(2)->format('Y-m-d')
-            ],
-            'end_date' => [
-                'required',
-                'date',
-                'after:start_date'
-            ],
-            'cars' => [
-                'required',
-                'array',
-                'max:2',
-                'min:1'
-            ],
-            'cars.*' => 'exists:cars,id'
-        ], [
-            'start_date.after_or_equal' => 'Bookings must be made at least 2 days in advance.',
-            'cars.max' => 'You can only book maximum 2 cars per booking.',
-            'cars.min' => 'Please select at least 1 car.',
-        ]);
+    public function store(Request $request)
+    {
+        try {
+            $request->validate([
+                'start_date' => [
+                    'required',
+                    'date',
+                    'after_or_equal:'.now()->addDays(2)->format('Y-m-d'),
+                ],
+                'end_date' => [
+                    'required',
+                    'date',
+                    'after:start_date',
+                ],
+                'cars' => [
+                    'required',
+                    'array',
+                    'max:2',
+                    'min:1',
+                ],
+                'cars.*' => 'exists:cars,id',
+            ], [
+                'start_date.after_or_equal' => 'Bookings must be made at least 2 days in advance.',
+                'cars.max' => 'You can only book maximum 2 cars per booking.',
+                'cars.min' => 'Please select at least 1 car.',
+            ]);
 
-        \Log::info('Laravel now(): ' . now());
-        \Log::info('Min allowed start_date: ' . now()->addDays(2)->format('Y-m-d'));
-        \Log::info('User input start_date: ' . $request->start_date);
+            \Log::info('Laravel now(): '.now());
+            \Log::info('Min allowed start_date: '.now()->addDays(2)->format('Y-m-d'));
+            \Log::info('User input start_date: '.$request->start_date);
 
-        // Check for existing bookings by the same user for the same period
-        $existingUserBookings = Booking::where('user_id', auth()->id())
-            ->where(function ($query) use ($request) {
-                $query->whereBetween('start_date', [$request->start_date, $request->end_date])
-                      ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
-                      ->orWhere(function ($q) use ($request) {
-                          $q->where('start_date', '<=', $request->start_date)
-                            ->where('end_date', '>=', $request->end_date);
-                      });
-            })
-            ->with('cars')
-            ->get();
+            // Check for existing bookings by the same user for the same period
+            $existingUserBookings = Booking::where('user_id', auth()->id())
+                ->where(function ($query) use ($request) {
+                    $query->whereBetween('start_date', [$request->start_date, $request->end_date])
+                        ->orWhereBetween('end_date', [$request->start_date, $request->end_date])
+                        ->orWhere(function ($q) use ($request) {
+                            $q->where('start_date', '<=', $request->start_date)
+                                ->where('end_date', '>=', $request->end_date);
+                        });
+                })
+                ->with('cars')
+                ->get();
 
-        $totalCarsInPeriod = $existingUserBookings->sum(function ($booking) {
-            return $booking->cars->count();
-        });
+            $totalCarsInPeriod = $existingUserBookings->sum(function ($booking) {
+                return $booking->cars->count();
+            });
 
-        if ($totalCarsInPeriod + count($request->cars) > 2) {
-            return back()->withErrors([
-                'cars' => 'You can only have maximum 2 cars booked for any overlapping period.'
-            ])->withInput();
-        }
-
-        // Check for car availability conflicts
-        $availability = app(BookingAvailabilityService::class);
-        foreach ($request->cars as $car_id) {
-            $conflict = $availability->hasConflict($car_id, $request->start_date, $request->end_date);
-
-            if ($conflict) {
-                $car = Car::find($car_id);
+            if ($totalCarsInPeriod + count($request->cars) > 2) {
                 return back()->withErrors([
-                    'cars' => "The {$car->brand} {$car->model} is already booked during the selected period."
+                    'cars' => 'You can only have maximum 2 cars booked for any overlapping period.',
                 ])->withInput();
             }
-        }
 
-        DB::beginTransaction();
+            // Check for car availability conflicts
+            $availability = app(BookingAvailabilityService::class);
+            foreach ($request->cars as $car_id) {
+                $conflict = $availability->hasConflict($car_id, $request->start_date, $request->end_date);
 
-        $totalDays = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date)) + 1;
+                if ($conflict) {
+                    $car = Car::find($car_id);
 
-        // Create the booking
-        $booking = Booking::create([
-            'user_id' => auth()->id(),
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
-            'status' => 'pending', // Default status
-            'total_days' => $totalDays,
-            'total_price' => 0, // Initialize 0, update after attaching cars
-        ]);
+                    return back()->withErrors([
+                        'cars' => "The {$car->brand} {$car->model} is already booked during the selected period.",
+                    ])->withInput();
+                }
+            }
 
-        $totalPrice = 0;
+            DB::beginTransaction();
 
-        // Attach cars to the booking with price and quantity
-        foreach ($request->cars as $car_id) {
-            $car = Car::findOrFail($car_id);
-            $priceForCar = $car->price_per_day * $totalDays;
-            $totalPrice += $priceForCar;
+            $totalDays = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date)) + 1;
 
-            DB::table('car_booking')->insert([
-                'booking_id' => $booking->id,
-                'car_id' => $car_id,
-                'rental_start' => $request->start_date,
-                'rental_end' => $request->end_date,
-                'quantity' => 1,
-                'price' => $priceForCar,
-                'created_at' => now(),
-                'updated_at' => now(),
+            // Create the booking
+            $booking = Booking::create([
+                'user_id' => auth()->id(),
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+                'status' => 'pending', // Default status
+                'total_days' => $totalDays,
+                'total_price' => 0, // Initialize 0, update after attaching cars
             ]);
+
+            $totalPrice = 0;
+
+            // Attach cars to the booking with price and quantity
+            foreach ($request->cars as $car_id) {
+                $car = Car::findOrFail($car_id);
+                $priceForCar = $car->price_per_day * $totalDays;
+                $totalPrice += $priceForCar;
+
+                DB::table('car_booking')->insert([
+                    'booking_id' => $booking->id,
+                    'car_id' => $car_id,
+                    'rental_start' => $request->start_date,
+                    'rental_end' => $request->end_date,
+                    'quantity' => 1,
+                    'price' => $priceForCar,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Update total_price on booking
+            $booking->update(['total_price' => $totalPrice]);
+
+            DB::commit();
+
+            $booking->load('cars');
+            auth()->user()->notify(new BookingConfirmed($booking));
+
+            return redirect()->route('bookings.index')->with('success',
+                'Booking created successfully! Your booking is pending approval. Total price: RM'.number_format($totalPrice, 2));
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            Log::error('Booking store error: '.$e->getMessage());
+
+            return back()->withErrors(['error' => 'Something went wrong while creating your booking: '.$e->getMessage()])->withInput();
         }
-
-        // Update total_price on booking
-        $booking->update(['total_price' => $totalPrice]);
-
-        DB::commit();
-
-        $booking->load('cars');
-        auth()->user()->notify(new BookingConfirmed($booking));
-
-        return redirect()->route('bookings.index')->with('success',
-            'Booking created successfully! Your booking is pending approval. Total price: RM' . number_format($totalPrice, 2));
-
-    } catch (\Exception $e) {
-        DB::rollback();
-        Log::error('Booking store error: ' . $e->getMessage());
-        return back()->withErrors(['error' => 'Something went wrong while creating your booking: ' . $e->getMessage()])->withInput();
     }
-}
-
 
     /**
      * Display the specified resource.
@@ -215,9 +218,11 @@ class BookingController extends Controller
             }
 
             $booking->load(['cars', 'cars.branch']);
+
             return view('bookings.show', compact('booking'));
         } catch (\Exception $e) {
-            Log::error('Booking show error: ' . $e->getMessage());
+            Log::error('Booking show error: '.$e->getMessage());
+
             return redirect()->route('bookings.index')->withErrors(['error' => 'Unable to load booking details. Please try again.']);
         }
     }
@@ -241,10 +246,11 @@ class BookingController extends Controller
 
             $branches = Branch::orderBy('name')->get();
             $cars = Car::with('branch')->orderBy('brand')->orderBy('model')->get();
-            
+
             return view('bookings.edit', compact('booking', 'cars', 'branches'));
         } catch (\Exception $e) {
-            Log::error('Booking edit form error: ' . $e->getMessage());
+            Log::error('Booking edit form error: '.$e->getMessage());
+
             return redirect()->route('bookings.index')->withErrors(['error' => 'Unable to load edit form. Please try again.']);
         }
     }
@@ -267,29 +273,28 @@ class BookingController extends Controller
             }
 
             $request->validate([
-    'start_date' => [
-        'required',
-        'date',
-        'after_or_equal:' . now()->addDays(2)->format('Y-m-d'), // Only this rule
-    ],
-    'end_date' => [
-        'required',
-        'date',
-        'after:start_date',
-    ],
-    'cars' => [
-        'required',
-        'array',
-        'max:2',
-        'min:1',
-    ],
-    'cars.*' => 'exists:cars,id',
-], [
-    'start_date.after_or_equal' => 'Bookings must be made at least 2 days in advance.',
-    'cars.max' => 'You can only book maximum 2 cars per booking.',
-    'cars.min' => 'Please select at least 1 car.',
-]);
-
+                'start_date' => [
+                    'required',
+                    'date',
+                    'after_or_equal:'.now()->addDays(2)->format('Y-m-d'), // Only this rule
+                ],
+                'end_date' => [
+                    'required',
+                    'date',
+                    'after:start_date',
+                ],
+                'cars' => [
+                    'required',
+                    'array',
+                    'max:2',
+                    'min:1',
+                ],
+                'cars.*' => 'exists:cars,id',
+            ], [
+                'start_date.after_or_equal' => 'Bookings must be made at least 2 days in advance.',
+                'cars.max' => 'You can only book maximum 2 cars per booking.',
+                'cars.min' => 'Please select at least 1 car.',
+            ]);
 
             // Check for conflicts (excluding current booking)
             $availability = app(BookingAvailabilityService::class);
@@ -298,14 +303,15 @@ class BookingController extends Controller
 
                 if ($conflict) {
                     $car = Car::find($car_id);
+
                     return back()->withErrors([
-                        'cars' => "The {$car->brand} {$car->model} is already booked during the selected period."
+                        'cars' => "The {$car->brand} {$car->model} is already booked during the selected period.",
                     ])->withInput();
                 }
             }
 
             DB::beginTransaction();
-            
+
             // Update booking details
             $booking->update([
                 'start_date' => $request->start_date,
@@ -335,8 +341,9 @@ class BookingController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
-            Log::error('Booking update error: ' . $e->getMessage());
-            return back()->withErrors(['error' => 'Something went wrong while updating your booking: ' . $e->getMessage()])->withInput();
+            Log::error('Booking update error: '.$e->getMessage());
+
+            return back()->withErrors(['error' => 'Something went wrong while updating your booking: '.$e->getMessage()])->withInput();
         }
     }
 
@@ -363,8 +370,9 @@ class BookingController extends Controller
             return redirect()->route('bookings.index')
                 ->with('success', 'Booking canceled successfully.');
         } catch (\Exception $e) {
-            Log::error('Booking destroy error: ' . $e->getMessage());
-            return redirect()->route('bookings.index')->withErrors(['error' => 'Unable to cancel booking: ' . $e->getMessage()]);
+            Log::error('Booking destroy error: '.$e->getMessage());
+
+            return redirect()->route('bookings.index')->withErrors(['error' => 'Unable to cancel booking: '.$e->getMessage()]);
         }
     }
 
@@ -383,16 +391,16 @@ class BookingController extends Controller
             ]);
 
             $carsQuery = Car::with('branch');
-            
+
             // Apply filters
             if ($request->branch_id) {
                 $carsQuery->where('branch_id', $request->branch_id);
             }
-            
+
             if ($request->transmission) {
                 $carsQuery->where('transmission', $request->transmission);
             }
-            
+
             if ($request->type) {
                 $carsQuery->where('type', $request->type);
             }
@@ -401,7 +409,7 @@ class BookingController extends Controller
             $unavailableCarIds = app(BookingAvailabilityService::class)
                 ->unavailableCarIds($request->start_date, $request->end_date);
 
-            if (!empty($unavailableCarIds)) {
+            if (! empty($unavailableCarIds)) {
                 $carsQuery->whereNotIn('id', $unavailableCarIds);
             }
 
@@ -409,14 +417,15 @@ class BookingController extends Controller
 
             return response()->json([
                 'cars' => $cars,
-                'count' => $cars->count()
+                'count' => $cars->count(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Get available cars error: ' . $e->getMessage());
+            Log::error('Get available cars error: '.$e->getMessage());
+
             return response()->json([
-                'error' => 'Unable to load available cars: ' . $e->getMessage(),
+                'error' => 'Unable to load available cars: '.$e->getMessage(),
                 'cars' => [],
-                'count' => 0
+                'count' => 0,
             ], 500);
         }
     }

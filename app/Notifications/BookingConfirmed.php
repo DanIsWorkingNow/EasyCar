@@ -17,9 +17,7 @@ class BookingConfirmed extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public Booking $booking)
-    {
-    }
+    public function __construct(public Booking $booking) {}
 
     public function via($notifiable): array
     {
@@ -35,8 +33,8 @@ class BookingConfirmed extends Notification implements ShouldQueue
             ->greeting("Hi {$notifiable->name},")
             ->line('Thanks for your booking! Here are the details:')
             ->line("Car(s): {$cars}")
-            ->line('Dates: ' . $this->booking->start_date->format('M d, Y') . ' – ' . $this->booking->end_date->format('M d, Y'))
-            ->line('Total: RM ' . number_format($this->booking->total_price, 2))
+            ->line('Dates: '.$this->booking->start_date->format('M d, Y').' – '.$this->booking->end_date->format('M d, Y'))
+            ->line('Total: RM '.number_format($this->booking->total_price, 2))
             ->line('Your booking is now pending approval. We will notify you as soon as it is reviewed.')
             ->action('View Booking', route('bookings.show', $this->booking));
     }

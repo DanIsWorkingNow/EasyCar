@@ -24,8 +24,11 @@ class PendingApprovalQueue extends Component
     use AuthorizesRequests;
 
     public ?int $branchId = null;
+
     public array $selected = [];
+
     public string $rejectReasonFor = '';
+
     public string $rejectReason = '';
 
     public function approve(int $bookingId): void

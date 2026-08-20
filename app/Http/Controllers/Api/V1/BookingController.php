@@ -61,7 +61,7 @@ class BookingController extends Controller
     public function store(Request $request, BookingAvailabilityService $availability)
     {
         $validated = $request->validate([
-            'start_date' => 'required|date|after_or_equal:' . now()->addDays(2)->toDateString(),
+            'start_date' => 'required|date|after_or_equal:'.now()->addDays(2)->toDateString(),
             'end_date' => 'required|date|after:start_date',
             'cars' => 'required|array|min:1|max:2',
             'cars.*' => 'exists:cars,id',
@@ -129,7 +129,7 @@ class BookingController extends Controller
         abort_unless($booking->isPending() && $booking->start_date->isFuture(), 422, 'This booking can no longer be edited.');
 
         $validated = $request->validate([
-            'start_date' => 'required|date|after_or_equal:' . now()->addDays(2)->toDateString(),
+            'start_date' => 'required|date|after_or_equal:'.now()->addDays(2)->toDateString(),
             'end_date' => 'required|date|after:start_date',
         ]);
 
@@ -203,7 +203,7 @@ class BookingController extends Controller
         $this->authorize('viewAny', Booking::class);
 
         $bookings = Booking::with('user', 'cars')->get();
-        $filename = 'bookings_export_' . now()->format('Ymd_His') . '.csv';
+        $filename = 'bookings_export_'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($bookings) {
             $handle = fopen('php://output', 'w');

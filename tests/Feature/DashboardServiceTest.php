@@ -1,8 +1,8 @@
 <?php
 
+use App\Models\Booking;
 use App\Models\Branch;
 use App\Models\Car;
-use App\Models\Booking;
 use App\Services\DashboardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

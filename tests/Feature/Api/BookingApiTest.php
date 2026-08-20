@@ -4,12 +4,13 @@ use App\Models\Booking;
 use App\Models\Branch;
 use App\Models\Car;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+    $this->seed(RolesAndPermissionsSeeder::class);
 });
 
 it('lets a customer create a booking and only see their own bookings', function () {

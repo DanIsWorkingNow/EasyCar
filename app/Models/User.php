@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,8 +12,8 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, HasRoles;
+    /** @use HasFactory<UserFactory> */
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -20,9 +21,8 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-    'name', 'email', 'password', 'role', 'userLevel', 'branch_id',
-];
-
+        'name', 'email', 'password', 'role', 'userLevel', 'branch_id',
+    ];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -48,15 +48,13 @@ class User extends Authenticatable
     }
 
     public function bookings()
-{
-    return $this->hasMany(Booking::class);
-}
+    {
+        return $this->hasMany(Booking::class);
+    }
 
-// app/Models/User.php
-public function branch()
-{
-    return $this->belongsTo(Branch::class);
-}
-
-
+    // app/Models/User.php
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
 }

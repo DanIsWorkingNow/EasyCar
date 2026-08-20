@@ -11,15 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-         Schema::create('car_booking', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('car_id')->constrained()->onDelete('cascade');
-        $table->foreignId('booking_id')->constrained()->onDelete('cascade');
-        $table->date('rental_start');
-        $table->date('rental_end');
-        $table->timestamps();
-        $table->unsignedInteger('total_days')->default(1);
-    });
+        Schema::create('car_booking', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('car_id')->constrained()->onDelete('cascade');
+            $table->foreignId('booking_id')->constrained()->onDelete('cascade');
+            $table->date('rental_start');
+            $table->date('rental_end');
+            $table->timestamps();
+            $table->unsignedInteger('total_days')->default(1);
+        });
     }
 
     /**

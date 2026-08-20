@@ -14,6 +14,7 @@ use Livewire\Component;
 class KpiCards extends Component
 {
     public ?int $branchId = null;
+
     public int $period = 30;
 
     public function render()

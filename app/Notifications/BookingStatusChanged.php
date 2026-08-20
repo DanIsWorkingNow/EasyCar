@@ -21,9 +21,7 @@ class BookingStatusChanged extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public Booking $booking)
-    {
-    }
+    public function __construct(public Booking $booking) {}
 
     public function via($notifiable): array
     {
@@ -33,12 +31,12 @@ class BookingStatusChanged extends Notification implements ShouldQueue
     public function toMail($notifiable): MailMessage
     {
         $mail = (new MailMessage)
-            ->subject("Booking #{$this->booking->id} " . ucfirst($this->booking->status) . ' — EasyCar')
+            ->subject("Booking #{$this->booking->id} ".ucfirst($this->booking->status).' — EasyCar')
             ->greeting("Hi {$notifiable->name},");
 
         if ($this->booking->isApproved()) {
             $mail->line('Great news — your booking has been approved!')
-                ->line('Dates: ' . $this->booking->start_date->format('M d, Y') . ' – ' . $this->booking->end_date->format('M d, Y'));
+                ->line('Dates: '.$this->booking->start_date->format('M d, Y').' – '.$this->booking->end_date->format('M d, Y'));
 
             if ($this->booking->approval_notes) {
                 $mail->line("Note from our team: {$this->booking->approval_notes}");

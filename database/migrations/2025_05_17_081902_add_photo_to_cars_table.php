@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('cars', function (Blueprint $table) {
-        $table->string('photo')->nullable(); // e.g. myvi.jpg
-    });
+            $table->string('photo')->nullable(); // e.g. myvi.jpg
+        });
     }
 
     /**
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('cars', function (Blueprint $table) {
-        $table->dropColumn('photo');
-    });
+            $table->dropColumn('photo');
+        });
     }
 };

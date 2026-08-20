@@ -2,12 +2,13 @@
 
 use App\Models\Branch;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+    $this->seed(RolesAndPermissionsSeeder::class);
 });
 
 it('returns branch-scoped KPIs for a staff user regardless of a supplied branch_id', function () {

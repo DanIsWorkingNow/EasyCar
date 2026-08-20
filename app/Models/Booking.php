@@ -117,7 +117,7 @@ class Booking extends Model
 
     public function getBookingPeriodAttribute(): string
     {
-        return $this->start_date->format('M d, Y') . ' - ' . $this->end_date->format('M d, Y');
+        return $this->start_date->format('M d, Y').' - '.$this->end_date->format('M d, Y');
     }
 
     public function getDaysUntilStartAttribute(): int

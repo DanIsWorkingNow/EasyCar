@@ -13,7 +13,7 @@ class BookingFactory extends Factory
     public function definition(): array
     {
         $start = fake()->dateTimeBetween('+3 days', '+10 days');
-        $end = (clone $start)->modify('+' . fake()->numberBetween(1, 5) . ' days');
+        $end = (clone $start)->modify('+'.fake()->numberBetween(1, 5).' days');
 
         return [
             'user_id' => User::factory(),

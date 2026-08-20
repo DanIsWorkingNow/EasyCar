@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Models\Branch;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -18,7 +19,9 @@ use Livewire\Component;
 class DashboardIndex extends Component
 {
     public ?int $branchId = null;
+
     public bool $isAdmin = false;
+
     public int $period = 30; // days
 
     public function mount(): void
@@ -44,7 +47,7 @@ class DashboardIndex extends Component
     #[Computed]
     public function branches()
     {
-        return $this->isAdmin ? \App\Models\Branch::orderBy('name')->get() : collect();
+        return $this->isAdmin ? Branch::orderBy('name')->get() : collect();
     }
 
     public function render()

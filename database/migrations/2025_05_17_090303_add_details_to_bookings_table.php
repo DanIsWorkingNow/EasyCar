@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-       Schema::table('bookings', function (Blueprint $table) {
-        $table->foreignId('user_id')->constrained()->onDelete('cascade');
-        $table->date('start_date');
-        $table->date('end_date');
-      
-    });
+        Schema::table('bookings', function (Blueprint $table) {
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->date('start_date');
+            $table->date('end_date');
+
+        });
     }
 
     /**
@@ -25,8 +25,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-        $table->dropForeign(['user_id']);
-        $table->dropColumn(['user_id', 'start_date', 'end_date']);
-    });
+            $table->dropForeign(['user_id']);
+            $table->dropColumn(['user_id', 'start_date', 'end_date']);
+        });
     }
 };

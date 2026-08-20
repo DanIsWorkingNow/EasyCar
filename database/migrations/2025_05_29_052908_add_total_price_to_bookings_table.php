@@ -9,19 +9,17 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-public function up()
-{
-    Schema::table('bookings', function (Blueprint $table) {
-        $table->decimal('total_price', 10, 2)->default(0)->after('rejection_reason');
-    });
-}
+    public function up()
+    {
+        Schema::table('bookings', function (Blueprint $table) {
+            $table->decimal('total_price', 10, 2)->default(0)->after('rejection_reason');
+        });
+    }
 
-public function down()
-{
-    Schema::table('bookings', function (Blueprint $table) {
-        $table->dropColumn('total_price');
-    });
-}
-
-
+    public function down()
+    {
+        Schema::table('bookings', function (Blueprint $table) {
+            $table->dropColumn('total_price');
+        });
+    }
 };

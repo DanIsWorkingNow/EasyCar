@@ -15,10 +15,10 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
         $this->call([
-        BranchSeeder::class,
-        CarSeeder::class,
-        UserSeeder::class,
-        RolesAndPermissionsSeeder::class,
-    ]);
+            BranchSeeder::class,
+            CarSeeder::class,
+            UserSeeder::class,
+            RolesAndPermissionsSeeder::class,
+        ]);
     }
 }

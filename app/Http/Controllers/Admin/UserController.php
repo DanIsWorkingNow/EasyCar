@@ -36,6 +36,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with('branch')->paginate(10);
+
         return view('admin.users.index', compact('users'));
     }
 
@@ -45,6 +46,7 @@ class UserController extends Controller
     public function create()
     {
         $branches = Branch::all();
+
         return view('admin.users.create', compact('branches'));
     }
 
@@ -88,6 +90,7 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $branches = Branch::all();
+
         return view('admin.users.edit', compact('user', 'branches'));
     }
 
@@ -98,7 +101,7 @@ class UserController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
             'userLevel' => 'required|integer|in:1,5',
             'branch_id' => 'nullable|exists:branches,id',
         ]);
@@ -131,6 +134,7 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         $user->delete();
+
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
     }
 }

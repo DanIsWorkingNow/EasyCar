@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Car;
 use App\Models\Branch;
+use App\Models\Car;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -24,12 +24,14 @@ class CarController extends Controller
     public function index()
     {
         $cars = Car::with('branch')->get();
+
         return view('admin.cars.index', compact('cars'));
     }
 
     public function create()
     {
         $branches = Branch::all();
+
         return view('admin.cars.create', compact('branches'));
     }
 
@@ -57,12 +59,14 @@ class CarController extends Controller
     public function show(Car $car)
     {
         $car->load('branch');
+
         return view('admin.cars.show', compact('car'));
     }
 
     public function edit(Car $car)
     {
         $branches = Branch::all();
+
         return view('admin.cars.edit', compact('car', 'branches'));
     }
 
@@ -97,6 +101,7 @@ class CarController extends Controller
         }
 
         $car->delete();
+
         return redirect()->route('admin.cars.index')->with('success', 'Car deleted.');
     }
 }

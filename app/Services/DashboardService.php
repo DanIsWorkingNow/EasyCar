@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\Branch;
 use App\Models\Car;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -118,7 +119,7 @@ class DashboardService
     public function getBranchComparison(Carbon $from, Carbon $to): array
     {
         return Cache::remember($this->cacheKey('branch-comparison', null, $from, $to), self::CACHE_TTL_SECONDS, function () use ($from, $to) {
-            return \App\Models\Branch::all()->map(function ($branch) use ($from, $to) {
+            return Branch::all()->map(function ($branch) use ($from, $to) {
                 $kpis = $this->getKpis($branch->id, $from, $to);
 
                 return [
@@ -176,7 +177,7 @@ class DashboardService
     public static function forgetCacheFor(?int $branchId): void
     {
         $today = now()->toDateString();
-        Cache::forget("dashboard:kpis:" . ($branchId ?? 'all') . ":{$today}:{$today}");
+        Cache::forget('dashboard:kpis:'.($branchId ?? 'all').":{$today}:{$today}");
         // Trend/branch-comparison caches expire naturally within 30s; not
         // worth enumerating every possible date-range key on every action.
     }

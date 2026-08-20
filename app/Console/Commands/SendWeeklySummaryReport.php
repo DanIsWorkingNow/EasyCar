@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Branch;
 use App\Models\Booking;
+use App\Models\Branch;
 use App\Models\User;
 use App\Notifications\WeeklySummaryReport;
 use App\Services\DashboardService;
@@ -26,7 +26,7 @@ class SendWeeklySummaryReport extends Command
         $to = now()->endOfDay();
 
         $summary = [
-            'period' => $from->format('M d') . ' – ' . $to->format('M d, Y'),
+            'period' => $from->format('M d').' – '.$to->format('M d, Y'),
             'total_bookings' => Booking::whereBetween('created_at', [$from, $to])->count(),
             'approved' => Booking::where('status', 'approved')->whereBetween('created_at', [$from, $to])->count(),
             'rejected' => Booking::where('status', 'rejected')->whereBetween('created_at', [$from, $to])->count(),

@@ -1,15 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\CarController as PublicCarController;
-use App\Http\Controllers\BookingController;
-use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
-use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Staff\CarController as StaffCarController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CarController as PublicCarController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Staff\BookingController as StaffBookingController;
+use App\Http\Controllers\Staff\CarController as StaffCarController;
 use App\Http\Controllers\Staff\DashboardController as StaffDashboardController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,7 +40,7 @@ Route::get('/', function () {
 
 Auth::routes();
 
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::get('/cars', [PublicCarController::class, 'index'])->name('cars.index');
 
 // Customer Bookings (authenticated users only)

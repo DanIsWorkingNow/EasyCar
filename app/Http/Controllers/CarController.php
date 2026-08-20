@@ -2,27 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
 use App\Models\Car;
 use Illuminate\Http\Request;
-use App\Models\Branch;
 
 class CarController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    
     public function index(Request $request)
     {
         $branches = Branch::all();
 
-    $cars = Car::with('branch')
-        ->when($request->branch_id, function ($query) use ($request) {
-            $query->where('branch_id', $request->branch_id);
-        })
-        ->get();
+        $cars = Car::with('branch')
+            ->when($request->branch_id, function ($query) use ($request) {
+                $query->where('branch_id', $request->branch_id);
+            })
+            ->get();
 
-    return view('cars.index', compact('cars', 'branches'));//
+        return view('cars.index', compact('cars', 'branches')); //
     }
 
     /**

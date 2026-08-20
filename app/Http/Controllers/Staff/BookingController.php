@@ -79,6 +79,7 @@ class BookingController extends Controller
                 : back()->with('error', 'Could not approve this booking — the car may no longer be available for these dates.');
         } catch (\Exception $e) {
             DB::rollBack();
+
             return back()->with('error', 'An error occurred while approving the booking.');
         }
     }
@@ -103,6 +104,7 @@ class BookingController extends Controller
                 : back()->with('error', 'Failed to reject booking. Please try again.');
         } catch (\Exception $e) {
             DB::rollBack();
+
             return back()->with('error', 'An error occurred while rejecting the booking.');
         }
     }
@@ -137,12 +139,13 @@ class BookingController extends Controller
 
             $message = "{$approvedCount} booking(s) approved.";
             if ($skipped) {
-                $message .= ' Skipped (outside your branch, already processed, or no longer available): ' . implode(', ', $skipped);
+                $message .= ' Skipped (outside your branch, already processed, or no longer available): '.implode(', ', $skipped);
             }
 
             return back()->with($skipped ? 'warning' : 'success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return back()->with('error', 'An error occurred during bulk approval.');
         }
     }
