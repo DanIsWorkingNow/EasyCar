@@ -85,8 +85,8 @@
                         $isSelected = in_array($car->id, $selectedCarIds, true);
                     @endphp
                     <div class="border rounded-xl p-3 relative {{ $isUnavailable ? 'opacity-50' : '' }} {{ $isSelected ? 'ring-2 ring-indigo-500' : '' }}">
-                        @if ($car->photo)
-                            <img src="{{ Storage::url($car->photo) }}" class="rounded-lg w-full h-32 object-cover mb-2" alt="{{ $car->brand }} {{ $car->model }}">
+                        @if ($car->photo_url)
+                            <img src="{{ $car->photo_url }}" class="rounded-lg w-full h-32 object-cover mb-2" alt="{{ $car->brand }} {{ $car->model }}">
                         @endif
 
                         <h3 class="font-bold">{{ $car->brand }} {{ $car->model }}</h3>

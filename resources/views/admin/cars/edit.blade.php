@@ -69,8 +69,8 @@
 
         <div class="mb-4">
             <label for="photo" class="block text-sm font-medium text-gray-700">Car Photo:</label>
-            @if ($car->photo)
-                <img src="{{ Storage::url($car->photo) }}" alt="{{ $car->brand }} {{ $car->model }}"
+            @if ($car->photo_url)
+                <img src="{{ $car->photo_url }}" alt="{{ $car->brand }} {{ $car->model }}"
                      class="mb-2" style="max-width: 200px; border-radius: 8px;">
             @endif
             <input type="file" id="photo" name="photo" class="mt-1 block w-full">

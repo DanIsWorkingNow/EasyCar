@@ -4,8 +4,8 @@
 <div class="max-w-3xl mx-auto p-6 bg-white rounded shadow">
     <h2 class="text-2xl font-bold mb-4">{{ $car->brand }} {{ $car->model }}</h2>
 
-    @if ($car->photo)
-        <img src="{{ Storage::url($car->photo) }}" alt="{{ $car->brand }} {{ $car->model }}"
+    @if ($car->photo_url)
+        <img src="{{ $car->photo_url }}" alt="{{ $car->brand }} {{ $car->model }}"
              class="mb-4" style="max-width: 320px; border-radius: 8px;">
     @endif
 
