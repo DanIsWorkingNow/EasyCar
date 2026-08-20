@@ -9,13 +9,13 @@
 
     <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <!-- Bootstrap CSS (was missing — this is why .row/.col-* and d-flex/d-none utilities weren't working) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap CSS is now imported inside resources/css/app.css, scoped to
+         a "bootstrap" cascade layer so it can't silently override Tailwind
+         utility classes (see the comment there for why). -->
 
     <!-- Fonts -->
     <link rel="dns-prefetch" href="//fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=Nunito:400,600,700,800" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 
     @viteReactRefresh
     @vite(['resources/css/app.css', 'resources/js/app.js'])
