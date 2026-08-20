@@ -43,6 +43,12 @@
         </div>
 
         <div class="mb-4">
+            <label for="plate_number" class="block text-sm font-medium text-gray-700">Plate Number:</label>
+            <input type="text" id="plate_number" name="plate_number" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm font-mono uppercase"
+                   value="{{ old('plate_number', $car->plate_number) }}" required>
+        </div>
+
+        <div class="mb-4">
             <label for="price_per_day" class="block text-sm font-medium text-gray-700">Price per Day (RM):</label>
             <input type="number" step="0.01" min="0.01" id="price_per_day" name="price_per_day"
                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm"

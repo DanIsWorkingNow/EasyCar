@@ -27,6 +27,11 @@
         </div>
 
         <div class="mb-4">
+            <label for="plate_number" class="block font-semibold">Plate Number:</label>
+            <input type="text" id="plate_number" name="plate_number" class="w-full border rounded p-2 font-mono uppercase" value="{{ old('plate_number') }}" required>
+        </div>
+
+        <div class="mb-4">
             <label for="price_per_day" class="block font-semibold">Price per Day (RM):</label>
             <input type="number" step="0.01" min="0.01" id="price_per_day" name="price_per_day" class="w-full border rounded p-2" value="{{ old('price_per_day') }}" required>
         </div>

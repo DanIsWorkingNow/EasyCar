@@ -18,6 +18,7 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Car Model</th>
                     <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Brand</th>
+                    <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Plate Number</th>
                     <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Transmission</th>
                     <th class="px-6 py-3 text-left text-sm font-medium text-gray-500">Action</th>
                 </tr>
@@ -27,6 +28,7 @@
                     <tr>
                         <td class="px-6 py-4 text-sm text-gray-900">{{ $car->model }}</td>
                         <td class="px-6 py-4 text-sm text-gray-900">{{ $car->brand }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 font-mono">{{ $car->plate_number ?? '—' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-900">{{ $car->transmission }}</td>
                         <td class="px-6 py-4 text-sm">
                             <a href="{{ route('admin.cars.edit', $car) }}" class="text-blue-600 hover:text-blue-900">Edit</a>

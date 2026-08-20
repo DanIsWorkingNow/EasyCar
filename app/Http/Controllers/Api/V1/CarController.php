@@ -11,9 +11,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * TSD Section 8.4. Authorization reuses the exact same CarPolicy (Level 1
- * Part 2) the web Admin\CarController enforces — $this->authorize() calls
- * below, not a re-implementation of the role checks.
+ * SUPERSEDES the CarController shipped in the API kit — adds plate_number
+ * validation (FR-CAR-06) to store() and update(), matching the web
+ * Admin\CarController in this same enhancement kit.
  */
 class CarController extends Controller
 {
@@ -26,8 +26,7 @@ class CarController extends Controller
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->type))
             ->when($request->filled('transmission'), fn ($q) => $q->where('transmission', $request->transmission))
             ->when($request->filled('brand'), function ($q) use ($request) {
-                // Portable case-insensitive match (TSD DB-03) — works on MySQL, SQLite, and PostgreSQL alike.
-                $q->whereRaw('LOWER(brand) LIKE ?', ['%'.strtolower($request->brand).'%']);
+                $q->whereRaw('LOWER(brand) LIKE ?', ['%' . strtolower($request->brand) . '%']);
             })
             ->paginate(20);
 
@@ -72,6 +71,7 @@ class CarController extends Controller
             'transmission' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'price_per_day' => 'required|numeric|min:0.01',
+            'plate_number' => 'required|string|max:20|unique:cars,plate_number',
             'photo' => 'nullable|image|max:4096',
         ]);
 
@@ -95,6 +95,7 @@ class CarController extends Controller
             'transmission' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'price_per_day' => 'required|numeric|min:0.01',
+            'plate_number' => 'required|string|max:20|unique:cars,plate_number,' . $car->id,
             'photo' => 'nullable|image|max:4096',
         ]);
 

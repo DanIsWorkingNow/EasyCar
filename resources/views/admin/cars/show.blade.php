@@ -10,6 +10,9 @@
     @endif
 
     <dl class="grid grid-cols-2 gap-2 text-sm">
+        <dt class="font-medium text-gray-700">Plate Number</dt>
+        <dd class="font-mono">{{ $car->plate_number ?? 'Not on file' }}</dd>
+
         <dt class="font-medium text-gray-700">Type</dt>
         <dd>{{ $car->type }}</dd>
 

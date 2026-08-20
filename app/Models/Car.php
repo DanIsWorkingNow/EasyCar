@@ -6,16 +6,19 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * SUPERSEDES the Car.php from Level 1 Part 2 (HasFactory trait,
- * price_per_day/photo fillable). This version adds the FR-CAR-04 status
- * field and a small helper for tracking how long a car has been in its
- * current status (downtime).
+ * SUPERSEDES the Car.php shipped in Level 3 (which added HasFactory,
+ * price_per_day/photo fillable, and the status field). This version adds
+ * plate_number (FR-CAR-06) to $fillable — the column itself comes from this
+ * kit's migration.
  */
 class Car extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['brand', 'model', 'type', 'transmission', 'branch_id', 'price_per_day', 'photo', 'status'];
+    protected $fillable = [
+        'brand', 'model', 'type', 'transmission', 'branch_id',
+        'price_per_day', 'photo', 'status', 'plate_number',
+    ];
 
     protected $casts = [
         'price_per_day' => 'decimal:2',
@@ -44,10 +47,6 @@ class Car extends Model
         return $query->where('status', 'maintenance');
     }
 
-    /**
-     * Change status and stamp when it changed, so downtime (time spent in
-     * 'maintenance') can be measured later from status_changed_at.
-     */
     public function setStatus(string $status): void
     {
         $this->update([

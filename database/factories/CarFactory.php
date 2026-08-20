@@ -6,6 +6,11 @@ use App\Models\Branch;
 use App\Models\Car;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * SUPERSEDES the CarFactory shipped in Level 1 Part 2 — adds plate_number
+ * (FR-CAR-06) so factory-created cars in tests always have one, matching
+ * production data after the backfill command runs.
+ */
 class CarFactory extends Factory
 {
     protected $model = Car::class;
@@ -20,6 +25,7 @@ class CarFactory extends Factory
             'price_per_day' => fake()->randomFloat(2, 45, 165),
             'branch_id' => Branch::factory(),
             'photo' => null,
+            'plate_number' => strtoupper(fake()->bothify('W? ####')),
         ];
     }
 }

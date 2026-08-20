@@ -9,15 +9,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * FIX (TD-18, TD-19): this controller is bound to Route::resource('/cars', ...),
- * which registers all seven RESTful routes including show/edit/update — but it
- * previously only implemented index(), create(), store(), and destroy(). The
- * admin car list's "Edit" link pointed at a route with no controller method
- * and no view behind it. This version adds the three missing methods, actually
- * validates and saves price_per_day and an uploaded photo (neither of which
- * store() persisted before, since neither was in Car's old $fillable), and
- * fixes both success redirects, which previously pointed at route('cars.index')
- * (the public car-browse page) instead of route('admin.cars.index').
+ * SUPERSEDES the CarController shipped in Level 1 Part 2 (which added the
+ * missing show/edit/update methods and price_per_day/photo handling). This
+ * version adds plate_number validation (FR-CAR-06) to store() and update().
  */
 class CarController extends Controller
 {
@@ -44,7 +38,8 @@ class CarController extends Controller
             'transmission' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'price_per_day' => 'required|numeric|min:0.01',
-            'photo' => 'nullable|image|max:4096', // 4MB
+            'plate_number' => 'required|string|max:20|unique:cars,plate_number',
+            'photo' => 'nullable|image|max:4096',
         ]);
 
         if ($request->hasFile('photo')) {
@@ -79,6 +74,7 @@ class CarController extends Controller
             'transmission' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'price_per_day' => 'required|numeric|min:0.01',
+            'plate_number' => 'required|string|max:20|unique:cars,plate_number,' . $car->id,
             'photo' => 'nullable|image|max:4096',
         ]);
 
