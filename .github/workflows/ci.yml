@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_sqlite, redis
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          touch database/database.sqlite
+
+      - name: Guard against unresolved Git conflict markers (TD-01 regression)
+        run: |
+          if grep -RIl -E '^(<{7}|={7}|>{7})' --include='*.php' --include='*.blade.php' .; then
+            echo "Unresolved merge-conflict markers found — see files listed above."
+            exit 1
+          fi
+
+      - name: Run Pint (code style)
+        run: ./vendor/bin/pint --test
+
+      - name: Run Larastan (static analysis)
+        run: ./vendor/bin/phpstan analyse --memory-limit=1G
+        continue-on-error: true
+
+      - name: Run test suite
+        env:
+          QUEUE_CONNECTION: sync # keep CI simple/fast; Notification::fake() doesn't need a real queue anyway
+        run: php artisan test

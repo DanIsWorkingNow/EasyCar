@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Car;
 use App\Models\Branch;
+use App\Notifications\BookingConfirmed;
 use App\Services\BookingAvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -188,7 +189,10 @@ class BookingController extends Controller
 
         DB::commit();
 
-        return redirect()->route('bookings.index')->with('success', 
+        $booking->load('cars');
+        auth()->user()->notify(new BookingConfirmed($booking));
+
+        return redirect()->route('bookings.index')->with('success',
             'Booking created successfully! Your booking is pending approval. Total price: RM' . number_format($totalPrice, 2));
 
     } catch (\Exception $e) {

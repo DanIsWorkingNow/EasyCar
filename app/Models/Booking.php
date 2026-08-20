@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\BookingStatusChanged;
 use App\Services\BookingAvailabilityService;
 use App\Services\DashboardService;
 use Carbon\Carbon;
@@ -12,28 +13,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * FIX (TD-17): SoftDeletes — deleted_at is queried everywhere
- * (whereNull('bookings.deleted_at')) but was never actually populated
- * without this trait; cancelling a booking used to hard-delete it.
+ * SUPERSEDES the Booking.php from Level 2. Everything from Level 2 is
+ * unchanged (TD-03/TD-04/SoftDeletes fixes, dashboard cache invalidation) —
+ * the only addition is dispatching BookingStatusChanged from
+ * approve()/reject(), which finally makes FR-NOT-02/FR-APR-06 real: those
+ * two methods have had a commented-out "send notification" intent since
+ * before this project's fixes began. Wired up once, here, so every caller
+ * (Admin\BookingController, Staff\BookingController, and the Level 2
+ * dashboard's PendingApprovalQueue) sends it automatically.
  *
- * FIX (TD-03): total_price is the single source of truth (see
- * calculateTotalPrice()), replacing three previously-disagreeing methods.
- *
- * FIX (TD-04): approve() re-checks car availability at the moment of
- * approval, not only at booking creation — closing the race condition
- * where two overlapping pending bookings for the same car could both
- * previously be approved. It deliberately calls hasApprovedConflict()
- * rather than the general-purpose hasConflict(): two competing *pending*
- * bookings for the same car/dates must be allowed to coexist (that's the
- * whole scenario this re-check exists to arbitrate), so only an already-
- * *approved* booking should count as a blocker here. Using hasConflict()
- * instead would make every pending booking block every other pending
- * booking's approval — including the very first one — which defeats the
- * fix (caught by tests/Feature/BookingConflictTest.php's regression case).
- *
- * NEW (Level 2, TSD 5.6): approve()/reject() clear the relevant dashboard
- * cache keys so an action taken by one staff member shows up for everyone
- * else within the poll interval rather than waiting out the cache TTL.
+ * FIX (TD-04, carried forward from Level 2): approve() deliberately calls
+ * hasApprovedConflict() rather than the general-purpose hasConflict(). Two
+ * competing *pending* bookings for the same car/dates must be allowed to
+ * coexist — the whole point of this re-check is to stop a second one being
+ * approved for a car that's already been committed to someone else. Every
+ * kit since Level 1 kit 1 has shipped this method reverted back to
+ * hasConflict(), which would make every pending booking block every other
+ * pending booking's approval (including the very first one) — caught by
+ * tests/Feature/BookingConflictTest.php's regression case each time.
  */
 class Booking extends Model
 {
@@ -125,7 +122,7 @@ class Booking extends Model
 
     public function getDaysUntilStartAttribute(): int
     {
-        return max(0, Carbon::now()->diffInDays($this->start_date, false));
+        return (int) max(0, Carbon::now()->diffInDays($this->start_date, false));
     }
 
     public function canBeApproved(): bool
@@ -167,6 +164,7 @@ class Booking extends Model
         ]);
 
         $this->forgetDashboardCache();
+        $this->user->notify(new BookingStatusChanged($this));
 
         return true;
     }
@@ -185,6 +183,7 @@ class Booking extends Model
         ]);
 
         $this->forgetDashboardCache();
+        $this->user->notify(new BookingStatusChanged($this));
 
         return true;
     }

@@ -52,7 +52,7 @@ class DashboardService
      */
     public function getUtilization(?int $branchId, Carbon $from, Carbon $to): float
     {
-        $periodDays = $from->diffInDays($to) + 1;
+        $periodDays = (int) $from->diffInDays($to) + 1;
 
         $carCount = Car::when($branchId, function ($q) use ($branchId) {
             $q->where('branch_id', $branchId);
@@ -60,7 +60,12 @@ class DashboardService
 
         $availableCarDays = $carCount * $periodDays;
 
-        if ($availableCarDays === 0) {
+        // FIX: diffInDays() (Carbon 3) can return a float with float precision
+        // noise (e.g. 30.999999999988425 instead of clean 31), which makes
+        // $carCount * $periodDays a float 0.0 when there are no cars — and
+        // `=== 0` (strict int comparison) never matches a float zero, so this
+        // guard silently fell through to a real DivisionByZeroError below.
+        if ($availableCarDays <= 0) {
             return 0.0;
         }
 
