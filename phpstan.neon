@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+
+    # Level 5 is a reasonable starting point against an existing codebase
+    # that wasn't written with static analysis in mind — raise it gradually
+    # as findings get cleaned up, rather than starting at max and drowning
+    # in noise. The CI step itself is continue-on-error: true, so this is
+    # informational for now, not a merge gate.
+    level: 5
