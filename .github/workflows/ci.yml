@@ -26,7 +26,13 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          # 8.2 (this repo's original scaffold constraint) no longer matches
+          # what's actually locked: local dev has been on PHP 8.5, and every
+          # `composer require` since resolved dependency versions accordingly
+          # (Symfony 8.x components, spatie/laravel-permission 8.3) — several
+          # of which need >=8.4.1. composer.json's "php" constraint is fixed
+          # to match; this must stay in sync with it.
+          php-version: '8.4'
           extensions: mbstring, pdo_sqlite, redis
           coverage: none
 
