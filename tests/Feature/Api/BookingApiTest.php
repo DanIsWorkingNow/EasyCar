@@ -112,3 +112,22 @@ it('lets staff approve a pending booking in their own branch', function () {
         ->assertOk()
         ->assertJsonPath('data.status', 'approved');
 });
+
+it('routes GET /bookings/export to the export endpoint, not the {booking} wildcard (Rate Limit Kit route-order regression)', function () {
+    // The Rate Limit Kit's own routes/api.php registers /bookings/export
+    // AFTER /bookings/{booking} — Laravel matches routes in registration
+    // order, so without this app's fix, this request would resolve to
+    // BookingController::show() with booking="export" (a 404 from failed
+    // route-model binding) instead of BookingController::export() (a CSV
+    // stream). If this test ever fails with a 404, check routes/api.php's
+    // ordering first, not the controller.
+    $admin = User::factory()->create(['userLevel' => 5]);
+    $admin->assignRole('admin');
+    $token = $admin->createToken('test')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', "Bearer {$token}")
+        ->get('/api/v1/bookings/export');
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('bookings_export_');
+});

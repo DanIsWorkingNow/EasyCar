@@ -5,7 +5,107 @@ integration session and grouped in [Keep a Changelog](https://keepachangelog.com
 style (`Added` / `Changed` / `Fixed`). Entries are reverse-chronological.
 Commit hashes refer to `main`.
 
-## [Unreleased] — 2026-08-20
+## [Unreleased] — 2026-08-21
+
+### Rate Limit Kit — routing fix + tiered throttling
+Integrated `EasyCar_RateLimit_Kit`. Fixes TD-23 (`routes/api.php` was never
+actually registered with the app — see verification note below) and TD-24
+(`app/Http/Kernel.php` was dead code), then adds the tiered rate limiting
+that was the original ask.
+
+**Verification note — TD-23 didn't reproduce as the kit describes.** The
+kit's docs claim the missing `api:` parameter meant *"the entire API kit
+has been unreachable since it shipped"* (blanket 404). Before applying
+anything, a live `GET /api/ping` with caches cleared returned `200`, not
+404. Root cause: `config/app.php` still carries a legacy Laravel-≤10-style
+`providers` array (left over from the Aug 20 "workflow fixes" commit) that
+includes `App\Providers\RouteServiceProvider`, and Laravel 11+ still merges
+`config('app.providers')` into its provider-boot list — so that old
+provider was registering `routes/api.php` as an accidental side effect the
+whole time. The **real**, currently-live gap was the one the kit's tiered
+limiters actually fix: of 24 API endpoints, only `POST /auth/login` had any
+rate limiting — the other 23 were gated by `auth:sanctum` alone with zero
+throttling. Applied the kit's explicit `api:` registration anyway — it's
+correct hygiene regardless of the accidental fallback, and removes the
+fragility (that fallback would vanish if `config/app.php` is ever cleaned
+up to the modern minimal skeleton).
+
+### Added
+- Three named rate limiters in `AppServiceProvider`: `login` (5/min by
+  IP+email, unchanged from Level 3), `api` (120/min per authenticated user,
+  30/min per IP for guests — applies to every `/api/v1/*` request), and
+  `api-write` (30/min, stacked on top of `api` for anything that mutates
+  data: booking/car/user writes, plus the CSV export).
+- `tests/Feature/Api/RoutingSmokeTest.php` — regression test asserting a
+  known API route returns 401 (route exists, needs auth), not 404, so a
+  TD-23-style regression fails CI instead of silently shipping again.
+- `tests/Feature/Api/RateLimitingTest.php` — confirms the login/api/
+  api-write limiters actually 429 once exceeded.
+
+### Fixed
+- `bootstrap/app.php` now explicitly names `api: routes/api.php` in
+  `withRouting()`, replacing the accidental legacy-provider fallback
+  described above with the real, modern registration path.
+- **Kit-shipped route-ordering bug, caught before merging.** The kit's
+  `routes/api.php` moved `GET /bookings/export` to *after*
+  `GET /bookings/{booking}` while restructuring around the new
+  `throttle:api-write` group. Laravel matches routes in registration
+  order, so a request to `/bookings/export` would have been swallowed by
+  the `{booking}` wildcard (`booking="export"`, a 404 from failed
+  route-model binding) instead of reaching `BookingController::export()`
+  — exactly the class of bug the *original* API kit's own comment
+  (*"/export and /bulk-approve before /{booking} for the same reason"*)
+  was written to prevent. Proved this empirically: temporarily applied the
+  kit's unmodified file and watched the new regression test fail with a
+  real 404, then restored the fix. `/bookings/export` and
+  `/bookings/bulk-approve` are now registered before the `{booking}`
+  wildcard, still under `throttle:api-write`. Added a dedicated regression
+  test for this in `tests/Feature/Api/BookingApiTest.php`, since neither
+  the kit's own tests nor the existing suite exercised the export route at
+  all.
+- Deleted `app/Http/Kernel.php` (`PATCHES_RATELIMIT.md`'s optional TD-24
+  cleanup) — confirmed dead code (nothing in the app binds `App\Http\
+  Kernel`; route count was identical, 101, before and after deletion).
+  `AdminMiddleware.php`/`StaffMiddleware.php` were already gone from an
+  earlier session.
+
+**Files:** `bootstrap/app.php`, `app/Providers/AppServiceProvider.php`,
+`routes/api.php`, `tests/Feature/Api/{RoutingSmokeTest,RateLimitingTest}.php`,
+`tests/Feature/Api/BookingApiTest.php`, `app/Http/Kernel.php` (deleted).
+**Verified:** full 41-test suite green, Pint clean, Larastan shows no new
+findings (57 pre-existing, same file set as before), live curl confirms
+login throttling (429 on the 6th attempt) and `/api/v1/bookings` returning
+401 not 404. *(Not yet committed.)*
+
+---
+
+## View Car in Add Booking Fixes — 2026-08-20 (`680a5bc`)
+Reported: car photos that used to show on the booking-creation page were
+missing after the Enhancement Kit rewrite.
+
+### Fixed
+- The old `bookings/create.blade.php` derived each car's image path
+  straight from its `model` name (`images/cars/{model_slug}.jpeg`); the new
+  Livewire picker instead checked a `photo` DB column, which is empty for
+  every seeded car — so no image ever rendered. Added a `photo_url`
+  accessor on `Car.php`: prefers an admin-uploaded `photo` if set, else
+  falls back to the same static-asset convention as before. Wired into the
+  Livewire picker and, for consistency, the two admin car pages that had
+  the same dead `@if($car->photo)` check.
+- Renamed all 10 files in `public/images/cars/` to lowercase
+  (`Bezza.jpeg` → `bezza.jpeg`, etc.) via `git mv`. The old mixed-case
+  names only "worked" because this dev box's filesystem is
+  case-insensitive — the Forge deploy target is Linux (case-sensitive), so
+  the original convention would have silently 404'd there.
+
+**Files:** `app/Models/Car.php`, `resources/views/livewire/booking/car-availability-picker.blade.php`,
+`resources/views/admin/cars/{edit,show}.blade.php`, `public/images/cars/*`.
+**Verified live:** all 10 car images load with real pixel dimensions, zero
+console errors on a fresh tab.
+
+---
+
+## Change Log Documentation & View Fix — 2026-08-20 (`168c467`)
 
 ### Fixed — Tailwind styling broken on `/bookings/create`
 Reported as *"The interface changed back to basic, please check and fix
@@ -37,7 +137,7 @@ bookings/create):
 **Files:** `resources/css/app.css`, `resources/views/layouts/app.blade.php`
 **Verified live:** button `border-radius` 0px → 8px, selected-car ring and
 indigo submit button now render with real computed colors, zero console
-errors on a fresh page load. *(Not yet committed.)*
+errors on a fresh page load.
 
 ---
 
@@ -224,3 +324,22 @@ Pre-kit fixes, from the start of this integration effort.
 - **CSS architecture:** Bootstrap must stay imported via the `bootstrap`
   cascade layer in `resources/css/app.css` (not a raw `<link>`) or
   Tailwind utilities will silently lose the cascade again.
+- **Recurring bug class:** kits restructuring `routes/api.php` around new
+  middleware groups have twice now silently reordered a literal route
+  (`/bookings/export`) to *after* a wildcard route (`/bookings/{booking}`)
+  that would swallow it. Laravel matches routes in registration order —
+  always check that literal/prefix routes stay before same-method wildcard
+  routes they could collide with, and don't trust a kit's own route
+  comments to have survived its own restructuring.
+- **Static asset filename case matters.** This dev box's filesystem is
+  case-insensitive; the Forge deploy target (Linux) is not. Any new static
+  asset convention (image paths, etc.) should be tested for case match, not
+  just existence, before assuming it'll work in production.
+- **`config/app.php`'s legacy `providers` array is still live** in this
+  app (left over from an Aug 20 Pint-driven commit) and silently duplicates
+  what `bootstrap/providers.php` and `bootstrap/app.php`'s `withRouting()`
+  are supposed to own — e.g. it was accidentally making `routes/api.php`
+  reachable before `bootstrap/app.php` explicitly registered it. Worth a
+  dedicated cleanup pass at some point to remove the legacy array now that
+  the modern registration paths are explicit, rather than leaving both
+  mechanisms doing the same job.
