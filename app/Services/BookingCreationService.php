@@ -10,42 +10,42 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Before this kit, the create-a-booking logic (conflict check, DB
- * transaction, per-car price calculation, total_price update) existed
- * twice: BookingController::store() (web) and Api\V1\BookingController::
- * store() (API kit). This service is the one place it now lives; the new
- * CarAvailabilityPicker Livewire component uses it directly, and both
- * controllers can be updated to call it too rather than keep their own
- * copies.
+ * The one place a booking is created or re-priced. Used by the Livewire
+ * booking flow, the web BookingController and the REST API so the
+ * business rules can't drift between them:
+ *
+ *  - every selected car must be free for the date range;
+ *  - a customer may hold at most MAX_CARS_PER_PERIOD cars across all of
+ *    their active bookings that overlap the range (previously only the
+ *    legacy web form enforced this — the Livewire flow and API skipped it);
+ *  - prices are computed server-side from price_per_day, never trusted
+ *    from the client.
  */
 class BookingCreationService
 {
-    public function __construct(private BookingAvailabilityService $availability)
-    {
-    }
+    public const MAX_CARS_PER_PERIOD = 2;
+
+    public function __construct(private BookingAvailabilityService $availability) {}
 
     /**
      * @param  int[]  $carIds
      *
-     * @throws ValidationException if any selected car conflicts with an
-     *         existing booking for the given date range.
+     * @throws ValidationException
      */
     public function create(User $user, array $carIds, string $startDate, string $endDate): Booking
     {
-        foreach ($carIds as $carId) {
-            if ($this->availability->hasConflict($carId, $startDate, $endDate)) {
-                throw ValidationException::withMessages([
-                    'cars' => ['One or more selected cars are not available for these dates.'],
-                ]);
-            }
-        }
+        $carIds = $this->normaliseIds($carIds);
 
-        // FIX: Carbon 3's diffInDays() can return a float with precision
-        // noise (e.g. 3.0000000001 instead of clean 3) — cast explicitly so
-        // total_days is a real int, not a float that happens to look like one.
-        $totalDays = (int) Carbon::parse($startDate)->diffInDays($endDate) + 1;
+        return DB::transaction(function () use ($user, $carIds, $startDate, $endDate) {
+            // Serialise concurrent submissions for the same cars so two
+            // customers can't both pass the availability check.
+            Car::whereIn('id', $carIds)->lockForUpdate()->get();
 
-        return DB::transaction(function () use ($user, $carIds, $startDate, $endDate, $totalDays) {
+            $this->assertAvailable($carIds, $startDate, $endDate);
+            $this->assertWithinCustomerLimit($user, $carIds, $startDate, $endDate);
+
+            $totalDays = $this->totalDays($startDate, $endDate);
+
             $booking = Booking::create([
                 'user_id' => $user->id,
                 'start_date' => $startDate,
@@ -55,24 +55,131 @@ class BookingCreationService
                 'total_price' => 0,
             ]);
 
-            $totalPrice = 0;
+            $booking->update(['total_price' => $this->attachCars($booking, $carIds, $startDate, $endDate, $totalDays)]);
 
-            foreach ($carIds as $carId) {
-                $car = Car::findOrFail($carId);
-                $price = $car->price_per_day * $totalDays;
-                $totalPrice += $price;
+            return $booking->load('cars');
+        });
+    }
 
-                $booking->cars()->attach($carId, [
-                    'rental_start' => $startDate,
-                    'rental_end' => $endDate,
-                    'quantity' => 1,
-                    'price' => $price,
+    /**
+     * Re-dates / re-cars an existing pending booking and recomputes its
+     * price. FIX: the old controller update path re-inserted pivot rows
+     * without price/quantity and never recalculated total_price, so an
+     * edited booking kept charging the original amount.
+     *
+     * @param  int[]  $carIds
+     *
+     * @throws ValidationException
+     */
+    public function update(Booking $booking, array $carIds, string $startDate, string $endDate): Booking
+    {
+        $carIds = $this->normaliseIds($carIds);
+
+        return DB::transaction(function () use ($booking, $carIds, $startDate, $endDate) {
+            Car::whereIn('id', $carIds)->lockForUpdate()->get();
+
+            $this->assertAvailable($carIds, $startDate, $endDate, $booking->id);
+            $this->assertWithinCustomerLimit($booking->user, $carIds, $startDate, $endDate, $booking->id);
+
+            $totalDays = $this->totalDays($startDate, $endDate);
+
+            $booking->cars()->detach();
+            $total = $this->attachCars($booking, $carIds, $startDate, $endDate, $totalDays);
+
+            $booking->update([
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'total_days' => $totalDays,
+                'total_price' => $total,
+            ]);
+
+            return $booking->load('cars');
+        });
+    }
+
+    /**
+     * Price quote without persisting anything (used by the booking UI).
+     *
+     * @param  int[]  $carIds
+     * @return array{days: int, total: float, lines: array<int, array{car_id: int, name: string, price: float}>}
+     */
+    public function quote(array $carIds, string $startDate, string $endDate): array
+    {
+        $days = $this->totalDays($startDate, $endDate);
+        $lines = Car::whereIn('id', $this->normaliseIds($carIds))->get()->map(fn (Car $car) => [
+            'car_id' => $car->id,
+            'name' => $car->name,
+            'price' => round((float) $car->price_per_day * $days, 2),
+        ])->values()->all();
+
+        return ['days' => $days, 'total' => round(array_sum(array_column($lines, 'price')), 2), 'lines' => $lines];
+    }
+
+    public function totalDays(string $startDate, string $endDate): int
+    {
+        // Carbon 3's diffInDays() can return a float with precision noise —
+        // cast so total_days is a clean int. Inclusive of both ends.
+        return (int) Carbon::parse($startDate)->startOfDay()->diffInDays(Carbon::parse($endDate)->startOfDay()) + 1;
+    }
+
+    private function assertAvailable(array $carIds, string $startDate, string $endDate, ?int $excludeBookingId = null): void
+    {
+        foreach ($carIds as $carId) {
+            if ($this->availability->hasConflict($carId, $startDate, $endDate, $excludeBookingId)) {
+                $car = Car::find($carId);
+
+                throw ValidationException::withMessages([
+                    'cars' => [$car
+                        ? "The {$car->brand} {$car->model} is not available for these dates."
+                        : 'One or more selected cars are not available for these dates.'],
                 ]);
             }
+        }
+    }
 
-            $booking->update(['total_price' => $totalPrice]);
+    private function assertWithinCustomerLimit(User $user, array $carIds, string $startDate, string $endDate, ?int $excludeBookingId = null): void
+    {
+        $alreadyHeld = DB::table('car_booking')
+            ->join('bookings', 'bookings.id', '=', 'car_booking.booking_id')
+            ->where('bookings.user_id', $user->id)
+            ->whereNull('bookings.deleted_at')
+            ->whereNotIn('bookings.status', Booking::RELEASED_STATUSES)
+            ->when($excludeBookingId, fn ($q) => $q->where('bookings.id', '!=', $excludeBookingId))
+            ->whereDate('car_booking.rental_start', '<=', $endDate)
+            ->whereDate('car_booking.rental_end', '>=', $startDate)
+            ->count();
 
-            return $booking;
-        });
+        if ($alreadyHeld + count($carIds) > self::MAX_CARS_PER_PERIOD) {
+            throw ValidationException::withMessages([
+                'cars' => ['You can have at most '.self::MAX_CARS_PER_PERIOD.' cars booked for any overlapping period.'],
+            ]);
+        }
+    }
+
+    private function attachCars(Booking $booking, array $carIds, string $startDate, string $endDate, int $totalDays): float
+    {
+        $total = 0.0;
+
+        foreach (Car::whereIn('id', $carIds)->get() as $car) {
+            $price = round((float) $car->price_per_day * $totalDays, 2);
+            $total += $price;
+
+            $booking->cars()->attach($car->id, [
+                'rental_start' => $startDate,
+                'rental_end' => $endDate,
+                'quantity' => 1,
+                'price' => $price,
+            ]);
+        }
+
+        return round($total, 2);
+    }
+
+    /**
+     * @return int[]
+     */
+    private function normaliseIds(array $carIds): array
+    {
+        return array_values(array_unique(array_map('intval', $carIds)));
     }
 }

@@ -33,9 +33,18 @@ class UserController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('branch')->paginate(10);
+        $users = User::with(['branch', 'roles'])
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $term = strtolower(trim($request->search));
+                $q->where(fn ($qq) => $qq->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('LOWER(email) LIKE ?', ["%{$term}%"]));
+            })
+            ->when($request->filled('role'), fn ($q) => $q->role($request->role))
+            ->orderBy('name')
+            ->paginate(15)
+            ->withQueryString();
 
         return view('admin.users.index', compact('users'));
     }
@@ -45,7 +54,7 @@ class UserController extends Controller
      */
     public function create()
     {
-        $branches = Branch::all();
+        $branches = Branch::orderBy('name')->get();
 
         return view('admin.users.create', compact('branches'));
     }
@@ -81,7 +90,7 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        return view('admin.users.show', compact('user'));
+        return redirect()->route('admin.users.edit', $user);
     }
 
     /**
@@ -89,7 +98,7 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        $branches = Branch::all();
+        $branches = Branch::orderBy('name')->get();
 
         return view('admin.users.edit', compact('user', 'branches'));
     }
@@ -133,6 +142,10 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        if ($user->is(Auth::user())) {
+            return back()->with('error', 'You cannot delete your own account.');
+        }
+
         $user->delete();
 
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');

@@ -63,3 +63,21 @@ jobs:
         env:
           QUEUE_CONNECTION: sync # keep CI simple/fast; Notification::fake() doesn't need a real queue anyway
         run: php artisan test
+
+  assets:
+    # Catches broken front-end builds (Tailwind, three.js viewer, fonts)
+    # before Forge's `npm ci && npm run build` does.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install and build
+        run: |
+          npm ci
+          npm run build

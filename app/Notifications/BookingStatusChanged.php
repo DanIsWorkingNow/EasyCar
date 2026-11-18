@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Enums\BookingPaymentStatus;
 use App\Models\Booking;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -9,13 +10,9 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * FR-NOT-02 / FR-APR-06. Replaces the commented-out
- * "// $this->sendApprovalNotification($booking);" line that existed (but did
- * nothing) in Admin\BookingController::approve()/reject() — dispatched
- * instead from Booking::approve()/reject() themselves, so every caller gets
- * it automatically: Admin\BookingController, Staff\BookingController, and
- * the Level 2 dashboard's PendingApprovalQueue Livewire component all call
- * those same two model methods.
+ * FR-NOT-02 / FR-APR-06. Dispatched from Booking::approve()/reject()/
+ * cancel() themselves, so every caller (web, API, dashboard widget,
+ * scheduled expiry) sends it automatically.
  */
 class BookingStatusChanged extends Notification implements ShouldQueue
 {
@@ -30,31 +27,37 @@ class BookingStatusChanged extends Notification implements ShouldQueue
 
     public function toMail($notifiable): MailMessage
     {
+        $booking = $this->booking;
+        $dates = $booking->start_date->format('M d, Y').' – '.$booking->end_date->format('M d, Y');
+
         $mail = (new MailMessage)
-            ->subject("Booking #{$this->booking->id} ".ucfirst($this->booking->status).' — EasyCar')
+            ->subject("Booking {$booking->reference} ".$booking->statusMeta()['label'].' — EasyCar')
             ->greeting("Hi {$notifiable->name},");
 
-        if ($this->booking->isApproved()) {
-            $mail->line('Great news — your booking has been approved!')
-                ->line('Dates: '.$this->booking->start_date->format('M d, Y').' – '.$this->booking->end_date->format('M d, Y'));
+        match ($booking->status) {
+            'approved' => $mail->line('Great news — your booking is confirmed!')
+                ->line("Dates: {$dates}")
+                ->when($booking->approval_notes, fn ($m) => $m->line("Note from our team: {$booking->approval_notes}")),
+            'cancelled' => $mail->line('Your booking has been cancelled.')
+                ->line("Reason: {$booking->cancellation_reason}"),
+            default => $mail->line('Unfortunately, your booking could not be approved.')
+                ->line("Reason: {$booking->rejection_reason}"),
+        };
 
-            if ($this->booking->approval_notes) {
-                $mail->line("Note from our team: {$this->booking->approval_notes}");
-            }
-        } else {
-            $mail->line('Unfortunately, your booking could not be approved.')
-                ->line("Reason: {$this->booking->rejection_reason}");
+        if (in_array($booking->payment_status, [BookingPaymentStatus::Refunded, BookingPaymentStatus::RefundPending], true)) {
+            $mail->line('Your payment is being refunded to your original payment method. Bank processing can take 5–10 business days.');
         }
 
-        return $mail->action('View Booking', route('bookings.show', $this->booking));
+        return $mail->action('View booking', route('bookings.show', $booking));
     }
 
     public function toArray($notifiable): array
     {
         return [
             'booking_id' => $this->booking->id,
+            'reference' => $this->booking->reference,
             'status' => $this->booking->status,
-            'message' => "Your booking is now {$this->booking->status}.",
+            'message' => "Booking {$this->booking->reference} is now ".strtolower($this->booking->statusMeta()['label']).'.',
         ];
     }
 }

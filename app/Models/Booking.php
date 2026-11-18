@@ -2,42 +2,59 @@
 
 namespace App\Models;
 
+use App\Enums\BookingPaymentStatus;
+use App\Enums\PaymentStatus;
 use App\Notifications\BookingStatusChanged;
 use App\Services\BookingAvailabilityService;
 use App\Services\DashboardService;
+use App\Services\PaymentService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
- * SUPERSEDES the Booking.php from Level 2. Everything from Level 2 is
- * unchanged (TD-03/TD-04/SoftDeletes fixes, dashboard cache invalidation) —
- * the only addition is dispatching BookingStatusChanged from
- * approve()/reject(), which finally makes FR-NOT-02/FR-APR-06 real: those
- * two methods have had a commented-out "send notification" intent since
- * before this project's fixes began. Wired up once, here, so every caller
- * (Admin\BookingController, Staff\BookingController, and the Level 2
- * dashboard's PendingApprovalQueue) sends it automatically.
+ * Booking lifecycle: pending -> approved | rejected | cancelled -> completed.
  *
- * FIX (TD-04, carried forward from Level 2): approve() deliberately calls
- * hasApprovedConflict() rather than the general-purpose hasConflict(). Two
- * competing *pending* bookings for the same car/dates must be allowed to
- * coexist — the whole point of this re-check is to stop a second one being
- * approved for a car that's already been committed to someone else. Every
- * kit since Level 1 kit 1 has shipped this method reverted back to
- * hasConflict(), which would make every pending booking block every other
- * pending booking's approval (including the very first one) — caught by
- * tests/Feature/BookingConflictTest.php's regression case each time.
+ * TD-04 (carried forward): approve() deliberately calls
+ * hasApprovedConflict() rather than hasConflict(). Two competing *pending*
+ * bookings for the same car/dates must be allowed to coexist — the re-check
+ * only stops a second one being approved for a car already committed to
+ * someone else. Guarded by tests/Feature/BookingConflictTest.php.
+ *
+ * Payments: a booking can be paid while pending or approved. Rejecting or
+ * cancelling a paid booking triggers a refund through PaymentService, which
+ * either refunds through the gateway or flags it for manual processing when
+ * the gateway has no refund API.
  */
 class Booking extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const STATUSES = ['pending', 'approved', 'rejected', 'completed', 'cancelled'];
+
+    /** Customer-facing label and badge tone per status. */
+    private const STATUS_META = [
+        'pending' => ['label' => 'Pending approval', 'tone' => 'warning'],
+        'approved' => ['label' => 'Confirmed', 'tone' => 'success'],
+        'rejected' => ['label' => 'Rejected', 'tone' => 'danger'],
+        'completed' => ['label' => 'Completed', 'tone' => 'info'],
+        'cancelled' => ['label' => 'Cancelled', 'tone' => 'neutral'],
+    ];
+
+    /** Statuses that no longer hold a car (excluded from availability checks). */
+    public const RELEASED_STATUSES = ['rejected', 'cancelled'];
+
     protected $fillable = [
         'user_id',
+        'reference',
         'start_date',
         'end_date',
         'total_days',
@@ -47,29 +64,86 @@ class Booking extends Model
         'approval_notes',
         'rejection_reason',
         'total_price',
+        'payment_status',
+        'cancelled_at',
+        'cancellation_reason',
+    ];
+
+    protected $attributes = [
+        'payment_status' => 'unpaid',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
         'approved_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'total_price' => 'float',
+        'payment_status' => BookingPaymentStatus::class,
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (Booking $booking) {
+            $booking->reference ??= static::generateReference();
+        });
+    }
+
+    /**
+     * Short, unambiguous, customer-facing code (no 0/O/1/I).
+     */
+    public static function generateReference(): string
+    {
+        $alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+        do {
+            $code = 'EC-';
+            for ($i = 0; $i < 8; $i++) {
+                $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+            }
+        } while (static::withTrashed()->where('reference', $code)->exists());
+
+        return $code;
+    }
+
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    /** @return BelongsToMany<Car, $this> */
     public function cars(): BelongsToMany
     {
         return $this->belongsToMany(Car::class, 'car_booking')
             ->withPivot('quantity', 'price')
             ->withTimestamps();
+    }
+
+    /** @return HasMany<Payment, $this> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /** @return HasOne<Payment, $this> */
+    public function latestPayment(): HasOne
+    {
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
+    /** @return HasOne<Payment, $this> */
+    public function successfulPayment(): HasOne
+    {
+        return $this->hasOne(Payment::class)->ofMany(['id' => 'max'], function (Builder $q) {
+            $q->whereIn('status', [PaymentStatus::Paid->value, PaymentStatus::Refunded->value, PaymentStatus::RefundPending->value]);
+        });
     }
 
     public function calculateTotalPrice(): float
@@ -102,17 +176,27 @@ class Booking extends Model
         return $this->status === 'cancelled';
     }
 
+    public function isPaid(): bool
+    {
+        return $this->payment_status === BookingPaymentStatus::Paid;
+    }
+
+    /**
+     * @return array{label: string, tone: string}
+     */
+    public function statusMeta(): array
+    {
+        return self::STATUS_META[$this->status] ?? ['label' => ucfirst((string) $this->status), 'tone' => 'neutral'];
+    }
+
+    /**
+     * Kept for backwards compatibility with any view still echoing it.
+     */
     public function getStatusBadgeAttribute(): string
     {
-        $badges = [
-            'pending' => '<span class="badge bg-warning text-dark">⏳ Pending</span>',
-            'approved' => '<span class="badge bg-success">✅ Approved</span>',
-            'rejected' => '<span class="badge bg-danger">❌ Rejected</span>',
-            'completed' => '<span class="badge bg-primary">🎉 Completed</span>',
-            'cancelled' => '<span class="badge bg-secondary">🚫 Cancelled</span>',
-        ];
+        $meta = $this->statusMeta();
 
-        return $badges[$this->status] ?? '<span class="badge bg-light text-dark">Unknown</span>';
+        return '<span class="badge badge-'.e($meta['tone']).'">'.e($meta['label']).'</span>';
     }
 
     public function getBookingPeriodAttribute(): string
@@ -122,7 +206,12 @@ class Booking extends Model
 
     public function getDaysUntilStartAttribute(): int
     {
-        return (int) max(0, Carbon::now()->diffInDays($this->start_date, false));
+        return (int) max(0, Carbon::now()->startOfDay()->diffInDays($this->start_date, false));
+    }
+
+    public function getCarNamesAttribute(): string
+    {
+        return $this->cars->map(fn ($c) => "{$c->brand} {$c->model}")->implode(', ');
     }
 
     public function canBeApproved(): bool
@@ -133,6 +222,30 @@ class Booking extends Model
     public function canBeRejected(): bool
     {
         return $this->isPending();
+    }
+
+    public function canBeEditedBy(User $user): bool
+    {
+        return $user->id === $this->user_id
+            && $this->isPending()
+            && ! $this->isPaid()
+            && $this->start_date->isFuture();
+    }
+
+    public function canBeCancelledBy(User $user): bool
+    {
+        return $user->id === $this->user_id
+            && in_array($this->status, ['pending', 'approved'], true)
+            && $this->start_date->isFuture();
+    }
+
+    public function canBePaid(): bool
+    {
+        return config('payments.enabled')
+            && in_array($this->status, ['pending', 'approved'], true)
+            && $this->payment_status === BookingPaymentStatus::Unpaid
+            && $this->total_price > 0
+            && ! $this->end_date->isPast();
     }
 
     public function approve(User $admin, ?string $notes = null): bool
@@ -182,26 +295,77 @@ class Booking extends Model
             'rejection_reason' => $reason,
         ]);
 
+        $this->refundIfPaid('Booking rejected: '.$reason);
         $this->forgetDashboardCache();
         $this->user->notify(new BookingStatusChanged($this));
 
         return true;
     }
 
+    public function cancel(?User $by = null, ?string $reason = null): bool
+    {
+        if (! in_array($this->status, ['pending', 'approved'], true)) {
+            return false;
+        }
+
+        $this->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancellation_reason' => $reason ?: match (true) {
+                $by === null => 'Cancelled automatically',
+                $by->id === $this->user_id => 'Cancelled by customer',
+                default => 'Cancelled by EasyCar staff',
+            },
+        ]);
+
+        // Abandon any checkout still in flight so a late gateway callback
+        // can't mark a cancelled booking as paid without a refund.
+        $this->payments()->where('status', PaymentStatus::Pending->value)->update([
+            'status' => PaymentStatus::Cancelled->value,
+            'failure_reason' => 'Booking cancelled',
+        ]);
+
+        $this->refundIfPaid($this->cancellation_reason);
+        $this->forgetDashboardCache();
+
+        if ($by === null || $by->id !== $this->user_id) {
+            $this->user->notify(new BookingStatusChanged($this));
+        }
+
+        return true;
+    }
+
+    private function refundIfPaid(string $reason): void
+    {
+        if (! $this->isPaid()) {
+            return;
+        }
+
+        try {
+            app(PaymentService::class)->refundBooking($this, $reason);
+            // Pick up the payment_status PaymentService just wrote so the
+            // notification below reflects the refund.
+            $this->payment_status = static::withTrashed()->whereKey($this->id)->value('payment_status');
+            $this->syncOriginalAttribute('payment_status');
+        } catch (\Throwable $e) {
+            // Never block a rejection/cancellation on a gateway outage —
+            // PaymentService has already flagged the payment for manual
+            // follow-up; log loudly so finance can act on it.
+            Log::error('Automatic refund failed', ['booking' => $this->id, 'error' => $e->getMessage()]);
+        }
+    }
+
     /**
      * Invalidates the dashboard's cached KPIs for every branch this booking
-     * touches, so an approval/rejection is reflected the moment it happens
-     * rather than waiting out the cache TTL.
+     * touches, so an approval/rejection is reflected immediately.
      */
     private function forgetDashboardCache(): void
     {
         $this->loadMissing('cars');
 
-        $branchIds = $this->cars->pluck('branch_id')->unique();
+        DashboardService::forgetCacheFor(null);
 
-        DashboardService::forgetCacheFor(null); // the "all branches" admin view
-
-        foreach ($branchIds as $branchId) {
+        foreach ($this->cars->pluck('branch_id')->unique() as $branchId) {
             DashboardService::forgetCacheFor($branchId);
         }
     }
@@ -219,5 +383,28 @@ class Booking extends Model
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');
+    }
+
+    public function scopeUpcoming($query)
+    {
+        return $query->whereIn('status', ['pending', 'approved'])
+            ->whereDate('end_date', '>=', now()->toDateString());
+    }
+
+    public function scopeSearch($query, ?string $term)
+    {
+        if (! filled($term)) {
+            return $query;
+        }
+
+        $term = Str::lower(trim($term));
+
+        return $query->where(function ($q) use ($term) {
+            $q->whereRaw('LOWER(reference) LIKE ?', ["%{$term}%"])
+                ->orWhereHas('user', function ($u) use ($term) {
+                    $u->whereRaw('LOWER(name) LIKE ?', ["%{$term}%"])
+                        ->orWhereRaw('LOWER(email) LIKE ?', ["%{$term}%"]);
+                });
+        });
     }
 }

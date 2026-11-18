@@ -4,249 +4,130 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
-use App\Models\User;
+use App\Support\Csv;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class BookingController extends Controller
 {
-    /**
-     * Display a listing of bookings with filtering options
-     */
     public function index(Request $request)
     {
-        $query = Booking::with(['user', 'cars', 'approvedBy']);
+        $bookings = $this->filtered($request)
+            ->with(['user', 'cars', 'approvedBy'])
+            ->latest()
+            ->paginate(15)
+            ->withQueryString();
 
-        // Filter by status if provided
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by date range if provided
-        if ($request->filled('start_date')) {
-            $query->where('start_date', '>=', $request->start_date);
-        }
-
-        if ($request->filled('end_date')) {
-            $query->where('end_date', '<=', $request->end_date);
-        }
-
-        // Search by customer name or email
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->whereHas('user', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        $bookings = $query->orderBy('created_at', 'desc')->paginate(15);
-
-        // Get counts for dashboard stats
         $stats = [
             'total' => Booking::count(),
             'pending' => Booking::pending()->count(),
             'approved' => Booking::approved()->count(),
             'rejected' => Booking::where('status', 'rejected')->count(),
+            'unpaid' => Booking::whereIn('status', ['pending', 'approved'])->where('payment_status', 'unpaid')->count(),
         ];
 
         return view('admin.bookings.index', compact('bookings', 'stats'));
     }
 
-    /**
-     * Show the details of a specific booking
-     */
     public function show(Booking $booking)
     {
-        $booking->load(['user', 'cars.branch', 'approvedBy']);
+        $booking->load(['user', 'cars.branch', 'approvedBy', 'payments' => fn ($q) => $q->latest()]);
 
         return view('admin.bookings.show', compact('booking'));
     }
 
-    /**
-     * Approve a booking
-     */
     public function approve(Request $request, Booking $booking)
     {
-        $request->validate([
-            'approval_notes' => 'nullable|string|max:500',
-        ]);
+        $request->validate(['approval_notes' => 'nullable|string|max:500']);
 
         if (! $booking->canBeApproved()) {
-            return back()->with('error', 'This booking cannot be approved. It may already be processed or doesn\'t meet approval criteria.');
+            return back()->with('error', 'This booking cannot be approved — it may already be processed or start too soon.');
         }
 
-        DB::beginTransaction();
-        try {
-            $success = $booking->approve(Auth::user(), $request->approval_notes);
+        $approved = DB::transaction(fn () => $booking->approve($request->user(), $request->approval_notes));
 
-            if ($success) {
-                // You can add email notification here
-                // $this->sendApprovalNotification($booking);
-
-                DB::commit();
-
-                return back()->with('success', 'Booking has been approved successfully! Customer will be notified.');
-            } else {
-                DB::rollback();
-
-                return back()->with('error', 'Failed to approve booking. Please try again.');
-            }
-        } catch (\Exception $e) {
-            DB::rollback();
-
-            return back()->with('error', 'An error occurred while approving the booking: '.$e->getMessage());
-        }
+        return $approved
+            ? back()->with('success', "Booking {$booking->reference} approved. The customer has been notified.")
+            : back()->with('error', 'Could not approve — the car is already committed to another approved booking for these dates.');
     }
 
-    /**
-     * Reject a booking
-     */
     public function reject(Request $request, Booking $booking)
     {
-        $request->validate([
-            'rejection_reason' => 'required|string|max:500',
-        ]);
+        $request->validate(['rejection_reason' => 'required|string|max:500']);
 
         if (! $booking->canBeRejected()) {
-            return back()->with('error', 'This booking cannot be rejected. It may already be processed.');
+            return back()->with('error', 'This booking cannot be rejected — it may already be processed.');
         }
 
-        DB::beginTransaction();
-        try {
-            $success = $booking->reject(Auth::user(), $request->rejection_reason);
+        $booking->reject($request->user(), $request->rejection_reason);
 
-            if ($success) {
-                // You can add email notification here
-                // $this->sendRejectionNotification($booking);
-
-                DB::commit();
-
-                return back()->with('success', 'Booking has been rejected. Customer will be notified.');
-            } else {
-                DB::rollback();
-
-                return back()->with('error', 'Failed to reject booking. Please try again.');
-            }
-        } catch (\Exception $e) {
-            DB::rollback();
-
-            return back()->with('error', 'An error occurred while rejecting the booking: '.$e->getMessage());
-        }
+        return back()->with('success', "Booking {$booking->reference} rejected. The customer has been notified".($booking->isPaid() ? '' : ' and any payment refunded').'.');
     }
 
-    /**
-     * Bulk approve multiple bookings
-     */
     public function bulkApprove(Request $request)
     {
         $request->validate([
             'booking_ids' => 'required|array',
-            'booking_ids.*' => 'exists:bookings,id',
+            'booking_ids.*' => 'integer|exists:bookings,id',
             'bulk_approval_notes' => 'nullable|string|max:500',
         ]);
 
-        $bookingIds = $request->booking_ids;
-        $notes = $request->bulk_approval_notes;
-        $approvedCount = 0;
-        $errors = [];
+        $approved = 0;
+        $skipped = [];
 
-        DB::beginTransaction();
-        try {
-            foreach ($bookingIds as $bookingId) {
-                $booking = Booking::find($bookingId);
-
-                if ($booking && $booking->canBeApproved()) {
-                    if ($booking->approve(Auth::user(), $notes)) {
-                        $approvedCount++;
-                    }
-                } else {
-                    $errors[] = "Booking #{$bookingId} cannot be approved.";
-                }
+        foreach (Booking::with('cars')->whereIn('id', $request->booking_ids)->get() as $booking) {
+            try {
+                $ok = $booking->canBeApproved()
+                    && DB::transaction(fn () => $booking->approve($request->user(), $request->bulk_approval_notes));
+            } catch (\Throwable $e) {
+                Log::error('Bulk approve failed', ['booking' => $booking->id, 'error' => $e->getMessage()]);
+                $ok = false;
             }
 
-            DB::commit();
-
-            $message = "Successfully approved {$approvedCount} booking(s).";
-            if (! empty($errors)) {
-                $message .= ' Some bookings could not be approved: '.implode(', ', $errors);
-            }
-
-            return back()->with('success', $message);
-        } catch (\Exception $e) {
-            DB::rollback();
-
-            return back()->with('error', 'An error occurred during bulk approval: '.$e->getMessage());
+            $ok ? $approved++ : $skipped[] = $booking->reference;
         }
+
+        $message = "{$approved} booking(s) approved.";
+        if ($skipped) {
+            $message .= ' Skipped: '.implode(', ', $skipped).' (already processed, starting too soon, or unavailable).';
+        }
+
+        return back()->with($skipped ? 'warning' : 'success', $message);
     }
 
-    /**
-     * Get booking statistics for dashboard
-     */
-    public function getStats()
+    public function export(Request $request)
     {
-        return [
-            'total_bookings' => Booking::count(),
-            'pending_approvals' => Booking::pending()->count(),
-            'approved_today' => Booking::approved()->whereDate('approved_at', today())->count(),
-            'rejected_this_month' => Booking::where('status', 'rejected')
-                ->whereMonth('created_at', now()->month)
-                ->count(),
-            'revenue_this_month' => Booking::approved()
-                ->whereMonth('created_at', now()->month)
-                ->sum('total_price'),
-        ];
+        $rows = $this->filtered($request)->with(['user', 'cars.branch'])->orderBy('id')->lazy(500)
+            ->map(fn (Booking $b) => [
+                $b->reference,
+                $b->user?->name,
+                $b->user?->email,
+                $b->cars->map(fn ($c) => "{$c->brand} {$c->model}".($c->plate_number ? " ({$c->plate_number})" : ''))->implode('; '),
+                $b->cars->pluck('branch.name')->filter()->unique()->implode('; '),
+                $b->start_date->toDateString(),
+                $b->end_date->toDateString(),
+                $b->total_days,
+                number_format((float) $b->total_price, 2, '.', ''),
+                $b->status,
+                $b->payment_status?->value,
+                $b->created_at?->toDateTimeString(),
+            ]);
+
+        return Csv::download('bookings_export_'.now()->format('Ymd_His').'.csv', [
+            'Reference', 'Customer', 'Email', 'Car(s)', 'Branch', 'Start', 'End', 'Days',
+            'Total (MYR)', 'Status', 'Payment', 'Created',
+        ], $rows);
     }
 
-    public function export()
+    private function filtered(Request $request): Builder
     {
-        $bookings = Booking::with('user', 'cars')->get();
-        $filename = 'bookings_export_'.now()->format('Ymd_His').'.csv';
-
-        return response()->streamDownload(function () use ($bookings) {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Booking ID', 'Customer Name', 'Start Date', 'End Date', 'Status', 'Car(s)']);
-
-            foreach ($bookings as $booking) {
-                $cars = $booking->cars->map(fn ($car) => "{$car->brand} {$car->model}")->implode('; ');
-                fputcsv($handle, [
-                    $booking->id,
-                    $booking->user->name,
-                    $booking->start_date,
-                    $booking->end_date,
-                    $booking->status,
-                    $cars,
-                ]);
-            }
-
-            fclose($handle);
-        }, $filename, ['Content-Type' => 'text/csv']);
-    }
-
-    /**
-     * Private method to send approval notification (implement as needed)
-     */
-    private function sendApprovalNotification(Booking $booking)
-    {
-        // Implement email notification logic here
-        // You can use Laravel's Mail facade or notification system
-
-        /*
-        Mail::to($booking->user->email)->send(new BookingApprovedMail($booking));
-        */
-    }
-
-    /**
-     * Private method to send rejection notification (implement as needed)
-     */
-    private function sendRejectionNotification(Booking $booking)
-    {
-        // Implement email notification logic here
-
-        /*
-        Mail::to($booking->user->email)->send(new BookingRejectedMail($booking));
-        */
+        return Booking::query()
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->payment_status))
+            ->when($request->filled('start_date'), fn ($q) => $q->whereDate('start_date', '>=', $request->start_date))
+            ->when($request->filled('end_date'), fn ($q) => $q->whereDate('end_date', '<=', $request->end_date))
+            ->search($request->input('search'));
     }
 }

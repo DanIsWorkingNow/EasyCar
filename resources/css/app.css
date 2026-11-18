@@ -1,13 +1,140 @@
-
-/* Bootstrap is loaded into an explicit "bootstrap" cascade layer, declared
-   here BEFORE the tailwindcss import. Tailwind v4 wraps its own output in
-   layers (theme, base, components, utilities); unlayered CSS always beats
-   layered CSS in the cascade regardless of specificity, so without this,
-   Bootstrap's reboot resets (e.g. `button { border-radius: 0 }`) silently
-   override Tailwind utility classes like `rounded-lg`. Importing it here
-   puts it in the "bootstrap" layer, which — because it's declared first —
-   sorts below all of Tailwind's layers, so Tailwind utilities correctly win. */
-@import url("https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css") layer(bootstrap);
 @import "tailwindcss";
+/* Self-hosted fonts (bundled by Vite): no third-party font CDN request. */
+@import "@fontsource/bebas-neue/latin-400.css";
+@import "@fontsource-variable/inter/index.css";
 
+/*
+|--------------------------------------------------------------------------
+| EasyCar design tokens — cinematic dark theme
+|--------------------------------------------------------------------------
+| Near-black canvas, one signature red, generous display type. Every
+| colour used by the UI comes from here.
+*/
+@theme {
+    --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: "Bebas Neue", Impact, "Arial Narrow", sans-serif;
 
+    --color-brand: #e50914;
+    --color-brand-hover: #f6121d;
+    --color-brand-deep: #b20710;
+    --color-ink: #0b0b0b;
+    --color-ink-900: #141414;
+    --color-ink-800: #181818;
+    --color-ink-700: #222222;
+    --color-ink-600: #2c2c2c;
+    --color-ink-500: #3a3a3a;
+    --color-line: rgb(255 255 255 / 0.09);
+    --color-mute: #b3b3b3;
+    --color-subtle: #8c8c8c;
+    --color-match: #46d369;
+
+    --shadow-tile: 0 18px 48px -12px rgb(0 0 0 / 0.85);
+    --shadow-glow: 0 0 0 1px rgb(229 9 20 / 0.4), 0 10px 40px -10px rgb(229 9 20 / 0.6);
+
+    --animate-fade-up: fade-up 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    --animate-shimmer: shimmer 1.6s linear infinite;
+
+    @keyframes fade-up {
+        from { opacity: 0; transform: translateY(18px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    @keyframes shimmer {
+        from { background-position: -400px 0; }
+        to { background-position: 400px 0; }
+    }
+}
+
+@layer base {
+    :root { color-scheme: dark; }
+    html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
+    body { @apply bg-ink font-sans text-white antialiased; text-rendering: optimizeLegibility; }
+    ::selection { background: var(--color-brand); color: #fff; }
+    [x-cloak] { display: none !important; }
+    :focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.6; cursor: pointer; }
+    input[type="color"] { @apply h-10 w-14 cursor-pointer rounded-md border border-white/15 bg-ink-700 p-1; }
+    * { scrollbar-color: #3a3a3a transparent; scrollbar-width: thin; }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+    }
+}
+
+@layer components {
+    .container-ec { @apply mx-auto w-full max-w-[1680px] px-4 sm:px-8 lg:px-14; }
+
+    .display { @apply font-display leading-[0.92] tracking-wide; }
+    .eyebrow { @apply text-[11px] font-bold tracking-[0.25em] text-brand uppercase; }
+
+    /* Buttons */
+    .btn { @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold whitespace-nowrap transition duration-150 select-none active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50; }
+    .btn-lg { @apply px-7 py-3 text-base; }
+    .btn-sm { @apply px-3 py-1.5 text-xs; }
+    .btn-icon { @apply p-2.5; }
+    .btn-primary { @apply bg-brand text-white shadow-[0_8px_24px_-8px_rgb(229_9_20/0.7)] hover:bg-brand-hover; }
+    .btn-light { @apply bg-white text-black hover:bg-white/80; }
+    .btn-ghost { @apply bg-[rgb(109_109_110/0.55)] text-white backdrop-blur hover:bg-[rgb(109_109_110/0.4)]; }
+    .btn-outline { @apply border border-white/25 text-white hover:border-white/70 hover:bg-white/5; }
+    .btn-quiet { @apply text-mute hover:bg-white/5 hover:text-white; }
+    .btn-success { @apply bg-emerald-600 text-white hover:bg-emerald-500; }
+    .btn-danger { @apply border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20; }
+
+    /* Surfaces */
+    .card { @apply rounded-xl border border-line bg-ink-800; }
+    .card-pad { @apply p-5 sm:p-6; }
+    .divider { @apply border-t border-line; }
+
+    /* Forms */
+    .label { @apply mb-1.5 block text-[11px] font-semibold tracking-wider text-mute uppercase; }
+    .input { @apply block w-full rounded-md border border-white/12 bg-ink-700 px-3.5 py-2.5 text-sm text-white transition placeholder:text-subtle focus:border-white/50 focus:ring-2 focus:ring-white/10 focus:outline-none disabled:opacity-60; }
+    .input-error { @apply border-red-500/70 focus:border-red-400; }
+    .field-error { @apply mt-1.5 text-xs text-red-400; }
+    .help { @apply mt-1.5 text-xs text-subtle; }
+    .checkbox { @apply size-4 cursor-pointer rounded border-white/30 bg-ink-700 accent-brand; }
+
+    /* Badges */
+    .badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ring-1 ring-inset; }
+    .badge-success { @apply bg-emerald-500/10 text-emerald-300 ring-emerald-500/30; }
+    .badge-warning { @apply bg-amber-500/10 text-amber-300 ring-amber-500/30; }
+    .badge-danger { @apply bg-red-500/10 text-red-300 ring-red-500/30; }
+    .badge-info { @apply bg-sky-500/10 text-sky-300 ring-sky-500/30; }
+    .badge-neutral { @apply bg-white/5 text-mute ring-white/15; }
+    .badge-brand { @apply bg-brand text-white ring-brand; }
+
+    /* Tables */
+    .table-ec { @apply w-full text-left text-sm; }
+    .table-ec thead th { @apply border-b border-line px-4 py-3 text-[11px] font-semibold tracking-wider whitespace-nowrap text-subtle uppercase; }
+    .table-ec tbody td { @apply border-b border-line px-4 py-3.5 align-middle; }
+    .table-ec tbody tr { @apply transition-colors hover:bg-white/[0.025]; }
+    .table-ec tbody tr:last-child td { @apply border-b-0; }
+
+    /* Horizontal rows (catalogue) */
+    .row-scroller { @apply -my-8 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth py-8; scrollbar-width: none; overscroll-behavior-x: contain; }
+    .row-scroller::-webkit-scrollbar { display: none; }
+
+    .rank-numeral {
+        @apply font-display select-none;
+        font-size: clamp(7rem, 12vw, 11rem);
+        line-height: 0.8;
+        color: var(--color-ink);
+        -webkit-text-stroke: 3px #5a5a5a;
+        letter-spacing: -0.06em;
+    }
+
+    .skeleton {
+        @apply rounded-md bg-ink-700;
+        background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.05), transparent);
+        background-size: 400px 100%;
+        background-repeat: no-repeat;
+        animation: var(--animate-shimmer);
+    }
+
+    .nav-link { @apply rounded-md px-3 py-2 text-sm font-medium text-mute transition hover:text-white; }
+    .nav-link-active { @apply text-white; }
+
+    .console-link { @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-mute transition hover:bg-white/5 hover:text-white; }
+    .console-link-active { @apply bg-white/[0.07] text-white shadow-[inset_3px_0_0_var(--color-brand)]; }
+
+    .stat-value { @apply font-display text-4xl leading-none tracking-wide; }
+}

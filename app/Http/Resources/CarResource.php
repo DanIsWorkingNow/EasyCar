@@ -4,7 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * SUPERSEDES the CarResource shipped in the API kit — adds plate_number
@@ -22,7 +21,12 @@ class CarResource extends JsonResource
             'transmission' => $this->transmission,
             'plate_number' => $this->plate_number,
             'price_per_day' => (float) $this->price_per_day,
-            'photo_url' => $this->photo ? Storage::url($this->photo) : null,
+            'year' => $this->year,
+            'seats' => $this->seats,
+            'fuel_type' => $this->fuel_type,
+            'color' => $this->paint_color,
+            'photo_url' => $this->photo_url,
+            'model_3d_url' => $this->model_3d_url,
             'status' => $this->status ?? 'available',
             'branch' => new BranchResource($this->whenLoaded('branch')),
         ];

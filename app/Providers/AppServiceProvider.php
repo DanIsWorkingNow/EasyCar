@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -30,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
+
+        Paginator::defaultView('partials.pagination');
 
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(5)->by($request->ip().'|'.$request->input('email'));

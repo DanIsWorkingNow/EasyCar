@@ -4,14 +4,23 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Branch extends Model
 {
     use HasFactory;
 
-    public function cars()
+    protected $fillable = ['name', 'address', 'city', 'phone'];
+
+    /** @return HasMany<Car, $this> */
+    public function cars(): HasMany
     {
         return $this->hasMany(Car::class);
     }
-    //
+
+    /** @return HasMany<User, $this> */
+    public function staff(): HasMany
+    {
+        return $this->hasMany(User::class);
+    }
 }

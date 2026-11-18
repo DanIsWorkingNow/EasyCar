@@ -1,194 +1,141 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EasyCar - Welcome</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+@extends('layouts.app')
 
-    <!-- Tailwind CSS (via Vite or CDN fallback) -->
-    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @else
-        <script src="https://cdn.tailwindcss.com"></script>
-    @endif
-</head>
-<body style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+@section('title', 'Car rental, reimagined')
+@section('nav_overlay', 'true')
+@if ($featured?->photo_url) @section('og_image', $featured->photo_url) @endif
 
-    <!-- Header Navigation -->
-    <header style="display: flex; justify-content: flex-end; padding: 2rem; position: relative; z-index: 10;">
-        @if (Route::has('login'))
-            <div style="display: flex; gap: 1.5rem; align-items: center;">
-                @auth
-                    <a href="{{ url('/home') }}" 
-                       style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); color: white; padding: 0.75rem 1.5rem; border-radius: 25px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.3);"
-                       onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='translateY(-2px)'"
-                       onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='translateY(0)'">
-                        🏠 Dashboard
-                    </a>
-                    <a href="{{ url('/logout') }}" 
-                       onclick="event.preventDefault();document.getElementById('logout-form').submit();"
-                       style="background: rgba(239,68,68,0.2); backdrop-filter: blur(10px); color: white; padding: 0.75rem 1.5rem; border-radius: 25px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; border: 1px solid rgba(239,68,68,0.3);"
-                       onmouseover="this.style.background='rgba(239,68,68,0.3)'; this.style.transform='translateY(-2px)'"
-                       onmouseout="this.style.background='rgba(239,68,68,0.2)'; this.style.transform='translateY(0)'">
-                        🚪 Logout
-                    </a>
-                    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">@csrf</form>
-                @else
-                    <a href="{{ route('login') }}" 
-                       style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); color: white; padding: 0.75rem 1.5rem; border-radius: 25px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; border: 1px solid rgba(255,255,255,0.3);"
-                       onmouseover="this.style.background='rgba(255,255,255,0.3)'; this.style.transform='translateY(-2px)'"
-                       onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='translateY(0)'">
-                        🔑 Login
-                    </a>
-                    @if (Route::has('register'))
-                        <a href="{{ route('register') }}" 
-                           style="background: linear-gradient(45deg, #10b981, #059669); color: white; padding: 0.75rem 1.5rem; border-radius: 25px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);"
-                           onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(16, 185, 129, 0.4)'"
-                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(16, 185, 129, 0.3)'">
-                        📝 Register
-                        </a>
-                    @endif
-                @endauth
-            </div>
-        @endif
-    </header>
-
-    <!-- Main Content -->
-    <main style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 2rem; margin-top: -4rem;">
-        
-        <!-- Hero Section -->
-        <div style="background: rgba(255,255,255,0.95); backdrop-filter: blur(15px); border-radius: 30px; padding: 4rem 3rem; margin-bottom: 3rem; box-shadow: 0 25px 50px rgba(0,0,0,0.15); text-align: center; max-width: 800px; width: 100%; position: relative; overflow: hidden;">
-            
-            <!-- Decorative Elements -->
-            <div style="position: absolute; top: -50px; right: -50px; width: 100px; height: 100px; background: linear-gradient(45deg, #667eea, #764ba2); border-radius: 50%; opacity: 0.1; animation: float 6s ease-in-out infinite;"></div>
-            <div style="position: absolute; bottom: -30px; left: -30px; width: 60px; height: 60px; background: linear-gradient(45deg, #10b981, #059669); border-radius: 50%; opacity: 0.1; animation: float 4s ease-in-out infinite reverse;"></div>
-            
-            <!-- Main Heading -->
-            <h1 style="font-size: 3.5rem; font-weight: 800; background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0 0 1rem 0; line-height: 1.2;">
-                🚗 Welcome to EasyCar
-            </h1>
-            
-            <!-- Subtitle -->
-            <p style="color: #6b7280; font-size: 1.3rem; margin: 0 0 2rem 0; line-height: 1.6; max-width: 600px; margin-left: auto; margin-right: auto;">
-                Your trusted Malaysian car rental platform. Experience premium vehicles, seamless booking, and exceptional service for every journey.
-            </p>
-
-            <!-- Feature Highlights -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 2.5rem 0;">
-                <div style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); padding: 1.5rem; border-radius: 20px; text-align: center; transition: transform 0.3s ease;"
-                     onmouseover="this.style.transform='translateY(-3px)'"
-                     onmouseout="this.style.transform='translateY(0)'">
-                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🌟</div>
-                    <h3 style="font-size: 1.1rem; font-weight: 700; color: #1f2937; margin: 0 0 0.5rem 0;">Premium Fleet</h3>
-                    <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">Top-quality vehicles from trusted brands</p>
-                </div>
-                
-                <div style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); padding: 1.5rem; border-radius: 20px; text-align: center; transition: transform 0.3s ease;"
-                     onmouseover="this.style.transform='translateY(-3px)'"
-                     onmouseout="this.style.transform='translateY(0)'">
-                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⚡</div>
-                    <h3 style="font-size: 1.1rem; font-weight: 700; color: #1f2937; margin: 0 0 0.5rem 0;">Instant Booking</h3>
-                    <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">Quick and hassle-free reservations</p>
-                </div>
-                
-                <div style="background: linear-gradient(135deg, #f8fafc, #e2e8f0); padding: 1.5rem; border-radius: 20px; text-align: center; transition: transform 0.3s ease;"
-                     onmouseover="this.style.transform='translateY(-3px)'"
-                     onmouseout="this.style.transform='translateY(0)'">
-                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🛡️</div>
-                    <h3 style="font-size: 1.1rem; font-weight: 700; color: #1f2937; margin: 0 0 0.5rem 0;">Reliable Service</h3>
-                    <p style="color: #6b7280; margin: 0; font-size: 0.9rem;">24/7 support and maintenance</p>
-                </div>
+@section('content')
+    {{-- ── Billboard ─────────────────────────────────────────────── --}}
+    @if ($featured)
+        <section class="relative isolate overflow-hidden" aria-label="Featured car">
+            <div class="absolute inset-0 -z-10">
+                <x-car-photo :car="$featured" eager class="object-cover object-[70%_center] sm:object-right" />
+                <div class="absolute inset-0 bg-gradient-to-r from-ink via-ink/75 to-transparent sm:via-ink/55"></div>
+                <div class="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-ink via-ink/70 to-transparent"></div>
+                <div class="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/60 to-transparent"></div>
             </div>
 
-            <!-- Action Buttons -->
-            @auth
-                <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center; margin-top: 2.5rem;">
-                    <a href="{{ url('/bookings') }}" 
-                       style="background: linear-gradient(45deg, #667eea, #764ba2); color: white; padding: 1.25rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 1.1rem; box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3); transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;"
-                       onmouseover="this.style.transform='translateY(-3px) scale(1.02)'; this.style.boxShadow='0 15px 35px rgba(102, 126, 234, 0.4)'"
-                       onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 10px 25px rgba(102, 126, 234, 0.3)'">
-                        📋 My Bookings
-                    </a>
-                    <a href="{{ url('/cars') }}" 
-                       style="background: linear-gradient(45deg, #10b981, #059669); color: white; padding: 1.25rem 2.5rem; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 1.1rem; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3); transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;"
-                       onmouseover="this.style.transform='translateY(-3px) scale(1.02)'; this.style.boxShadow='0 15px 35px rgba(16, 185, 129, 0.4)'"
-                       onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 10px 25px rgba(16, 185, 129, 0.3)'">
-                        🚗 Browse Cars
-                    </a>
-                </div>
-            @else
-                <div style="margin-top: 2.5rem;">
-                    <a href="{{ route('register') }}" 
-                       style="background: linear-gradient(45deg, #10b981, #059669); color: white; padding: 1.5rem 3rem; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 1.3rem; box-shadow: 0 15px 35px rgba(16, 185, 129, 0.3); transition: all 0.4s ease; display: inline-flex; align-items: center; gap: 0.75rem;"
-                       onmouseover="this.style.transform='translateY(-5px) scale(1.05)'; this.style.boxShadow='0 20px 45px rgba(16, 185, 129, 0.4)'"
-                       onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 15px 35px rgba(16, 185, 129, 0.3)'">
-                        🚀 Get Started - Register Now
-                    </a>
-                    
-                    <p style="color: #6b7280; margin: 1.5rem 0 0 0; font-size: 0.95rem;">
-                        Already have an account? 
-                        <a href="{{ route('login') }}" style="color: #667eea; font-weight: 600; text-decoration: none;">
-                            Sign in here
-                        </a>
+            <div class="flex min-h-[680px] flex-col justify-end px-4 pt-28 pb-44 sm:min-h-[90vh] sm:px-8 sm:pb-56 lg:px-14">
+                <div class="max-w-2xl animate-fade-up">
+                    <p class="flex items-center gap-2 text-xs font-bold tracking-[0.3em] text-white/80 uppercase">
+                        <span class="grid size-6 place-items-center rounded-sm bg-brand font-display text-base tracking-normal text-white">E</span>
+                        Featured this week
                     </p>
+                    <h1 class="display mt-4 text-[clamp(3.75rem,11vw,9.5rem)] text-white drop-shadow-[0_4px_24px_rgba(0,0,0,0.6)]"><span class="block">{{ $featured->brand }}</span><span class="block whitespace-nowrap">{{ $featured->model }}</span></h1>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-white/80 sm:text-base">
+                        <span class="font-bold text-match">{{ $featured->status === 'available' ? 'Available now' : 'Popular pick' }}</span>
+                        @if ($featured->year)<span>{{ $featured->year }}</span>@endif
+                        <span class="rounded border border-white/40 px-1.5 text-xs leading-5">{{ $featured->type }}</span>
+                        <span>{{ $featured->seats }} seats</span>
+                        <span class="capitalize">{{ strtolower($featured->transmission) }}</span>
+                        <span class="rounded border border-white/40 px-1.5 text-xs leading-5">3D</span>
+                    </div>
+
+                    <p class="mt-5 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
+                        {{ $featured->description ?: "Spin it around in our 3D showroom, check live availability and lock it in for your next trip from {$featured->branch?->name}." }}
+                    </p>
+
+                    <div class="mt-8 flex flex-wrap items-center gap-3">
+                        <a href="{{ route('bookings.create', ['car' => $featured->id]) }}" class="btn btn-light btn-lg">
+                            <x-icon name="play" solid class="size-6" /> Book now
+                        </a>
+                        <a href="{{ route('cars.show', $featured) }}" class="btn btn-ghost btn-lg">
+                            <x-icon name="cube" class="size-6" /> Explore in 3D
+                        </a>
+                        <span class="ml-1 text-sm text-white/70">from <span class="font-display text-2xl tracking-wide text-white">RM {{ number_format($featured->price_per_day, 0) }}</span>/day</span>
+                    </div>
                 </div>
-            @endauth
-        </div>
-
-        <!-- Quick Stats Section -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; max-width: 800px; width: 100%; margin-bottom: 2rem;">
-            <div style="background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); transition: transform 0.3s ease;"
-                 onmouseover="this.style.transform='translateY(-5px)'"
-                 onmouseout="this.style.transform='translateY(0)'">
-                <div style="font-size: 2rem; font-weight: 800; color: #667eea; margin-bottom: 0.5rem;">9+</div>
-                <div style="color: #6b7280; font-weight: 600;">Premium Vehicles</div>
             </div>
-            
-            <div style="background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); transition: transform 0.3s ease;"
-                 onmouseover="this.style.transform='translateY(-5px)'"
-                 onmouseout="this.style.transform='translateY(0)'">
-                <div style="font-size: 2rem; font-weight: 800; color: #10b981; margin-bottom: 0.5rem;">24/7</div>
-                <div style="color: #6b7280; font-weight: 600;">Customer Support</div>
-            </div>
-            
-            <div style="background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); padding: 2rem; border-radius: 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); transition: transform 0.3s ease;"
-                 onmouseover="this.style.transform='translateY(-5px)'"
-                 onmouseout="this.style.transform='translateY(0)'">
-                <div style="font-size: 2rem; font-weight: 800; color: #f59e0b; margin-bottom: 0.5rem;">3</div>
-                <div style="color: #6b7280; font-weight: 600;">Branches</div>
-            </div>
-        </div>
-    </main>
+        </section>
+    @endif
 
-    <!-- Footer -->
-    <footer style="text-align: center; padding: 2rem; margin-top: 2rem;">
-        <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); padding: 1.5rem; border-radius: 15px; display: inline-block;">
-            <p style="color: rgba(255,255,255,0.8); margin: 0; font-weight: 500;">
-                &copy; {{ date('Y') }} EasyCar. All rights reserved.
-            </p>
-        </div>
-    </footer>
+    {{-- ── Rows ──────────────────────────────────────────────────── --}}
+    <div class="relative z-10 {{ $featured ? '-mt-28 sm:-mt-36' : 'pt-28' }} space-y-10 sm:space-y-12">
+        @forelse ($rows as $row)
+            <x-car-row :title="$row['title']" :cars="$row['cars']" :ranked="$row['ranked'] ?? false" :href="route('cars.index')" />
+        @empty
+            <div class="container-ec"><x-empty-state title="The showroom is being prepared" description="New cars are on their way. Check back soon." /></div>
+        @endforelse
+    </div>
 
-    <style>
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        @media (max-width: 768px) {
-            main h1 {
-                font-size: 2.5rem !important;
-            }
-            
-            main p {
-                font-size: 1.1rem !important;
-            }
-            
-            .feature-grid {
-                grid-template-columns: 1fr !important;
-            }
-        }
-    </style>
-</body>
-</html>
+    {{-- ── How it works ──────────────────────────────────────────── --}}
+    <section class="mt-24 border-y-[6px] border-ink-900">
+        <div class="container-ec grid gap-12 py-20 lg:grid-cols-3 lg:gap-8">
+            @foreach ([
+                ['cube', 'Explore in 3D', 'Rotate, zoom and repaint every car in our interactive showroom before you commit.'],
+                ['calendar', 'Book in a minute', 'Live availability across all branches. Pick your dates, pick up to two cars, done.'],
+                ['shield', 'Pay securely', 'Card, FPX online banking or GrabPay through encrypted checkout. Automatic refunds if plans change.'],
+            ] as [$icon, $title, $copy])
+                <div class="flex gap-5">
+                    <span class="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand/25 to-brand/5 ring-1 ring-brand/30">
+                        <x-icon :name="$icon" class="size-7 text-brand" />
+                    </span>
+                    <div>
+                        <h2 class="display text-3xl">{{ $title }}</h2>
+                        <p class="mt-2 leading-relaxed text-mute">{{ $copy }}</p>
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </section>
+
+    {{-- ── Numbers + branches ────────────────────────────────────── --}}
+    <section class="container-ec mt-20 grid gap-10 lg:grid-cols-[1fr_1.4fr] lg:items-center">
+        <div>
+            <p class="eyebrow">Across the Klang Valley</p>
+            <h2 class="display mt-3 text-5xl sm:text-6xl">Pick up where<br>you are.</h2>
+            <dl class="mt-8 grid grid-cols-3 gap-4">
+                <div><dt class="text-xs text-subtle uppercase">Cars</dt><dd class="stat-value mt-1">{{ $stats['cars'] }}</dd></div>
+                <div><dt class="text-xs text-subtle uppercase">Branches</dt><dd class="stat-value mt-1">{{ $stats['branches'] }}</dd></div>
+                <div><dt class="text-xs text-subtle uppercase">Trips</dt><dd class="stat-value mt-1">{{ number_format($stats['trips']) }}+</dd></div>
+            </dl>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-3">
+            @foreach ($branches as $branch)
+                <a href="{{ route('cars.index', ['branch_id' => $branch->id]) }}" class="group card card-pad flex flex-col justify-between transition hover:-translate-y-1 hover:border-white/20">
+                    <x-icon name="map-pin" class="size-6 text-brand" />
+                    <div class="mt-8">
+                        <h3 class="display text-3xl">{{ $branch->name }}</h3>
+                        <p class="mt-1 text-sm text-subtle">{{ $branch->cars_count }} cars{{ $branch->city ? ' · '.$branch->city : '' }}</p>
+                        <span class="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-white/80 group-hover:text-white">Browse <x-icon name="arrow-right" class="size-4 transition group-hover:translate-x-1" /></span>
+                    </div>
+                </a>
+            @endforeach
+        </div>
+    </section>
+
+    {{-- ── FAQ ───────────────────────────────────────────────────── --}}
+    <section class="mx-auto mt-24 max-w-4xl px-4" x-data="{ open: null }">
+        <h2 class="display text-center text-5xl sm:text-6xl">Frequently asked questions</h2>
+        <div class="mt-10 space-y-2">
+            @foreach ([
+                ['How far in advance do I need to book?', 'Bookings start at least 2 days from today. That gives our branch team time to prepare, inspect and clean your car.'],
+                ['How do I pay?', 'Pay online right after booking with Visa, Mastercard, FPX online banking or GrabPay. Your car is held for '.config('payments.hold_minutes').' minutes while you complete payment.'],
+                ['What if my booking is rejected or I cancel?', 'Cancel any time before pickup from My bookings. If you have already paid — or if we can\'t confirm your booking — you are refunded automatically to your original payment method.'],
+                ['Can I book more than one car?', 'Yes — up to two cars for overlapping dates, perfect for family trips or events.'],
+                ['What do I need at pickup?', 'A valid driving licence, your IC or passport, and your booking reference (it\'s in your confirmation email and on the booking page).'],
+            ] as $i => [$q, $a])
+                <div class="bg-ink-700">
+                    <button type="button" @click="open = open === {{ $i }} ? null : {{ $i }}" class="flex w-full items-center justify-between gap-6 px-6 py-5 text-left text-lg font-medium hover:bg-ink-600 sm:text-xl" :aria-expanded="open === {{ $i }}">
+                        {{ $q }}
+                        <x-icon name="plus" class="size-7 shrink-0 transition duration-300" ::class="open === {{ $i }} && 'rotate-45'" />
+                    </button>
+                    <div x-show="open === {{ $i }}" x-collapse x-cloak class="border-t border-ink px-6 py-5 text-base leading-relaxed text-white/80 sm:text-lg">{{ $a }}</div>
+                </div>
+            @endforeach
+        </div>
+    </section>
+
+    {{-- ── CTA ───────────────────────────────────────────────────── --}}
+    @guest
+        <section class="mx-auto mt-16 max-w-3xl px-4 text-center">
+            <p class="text-lg text-white/85">Ready to drive? Enter your email to create your account.</p>
+            <form action="{{ route('register') }}" method="GET" class="mt-4 flex flex-col gap-2 sm:flex-row">
+                <label class="sr-only" for="cta-email">Email address</label>
+                <input id="cta-email" type="email" name="email" required placeholder="Email address" class="input h-14 flex-1 bg-black/60 text-base">
+                <button class="btn btn-primary btn-lg h-14 text-xl">Get started <x-icon name="chevron-right" class="size-6" /></button>
+            </form>
+        </section>
+    @endguest
+@endsection

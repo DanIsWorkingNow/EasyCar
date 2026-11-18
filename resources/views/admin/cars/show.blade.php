@@ -1,34 +1,48 @@
-@extends('layouts.app')
+@extends('layouts.console')
+
+@section('title', $car->name)
+@section('breadcrumb', 'Admin console / Fleet / '.$car->name)
 
 @section('content')
-<div class="max-w-3xl mx-auto p-6 bg-white rounded shadow">
-    <h2 class="text-2xl font-bold mb-4">{{ $car->brand }} {{ $car->model }}</h2>
+    <x-page-header :eyebrow="$car->plate_number" :title="$car->name" :back="route('admin.cars.index')">
+        <x-slot:actions>
+            <a href="{{ route('cars.show', $car) }}" class="btn btn-quiet" target="_blank" rel="noopener"><x-icon name="external" class="size-4" /> Storefront</a>
+            <a href="{{ route('admin.cars.edit', $car) }}" class="btn btn-outline"><x-icon name="pencil" class="size-4" /> Edit</a>
+            <form method="POST" action="{{ route('admin.cars.destroy', $car) }}" data-confirm="Remove {{ $car->name }} from the fleet? This cannot be undone.">
+                @csrf @method('DELETE')
+                <button class="btn btn-danger"><x-icon name="trash" class="size-4" /> Delete</button>
+            </form>
+        </x-slot:actions>
+    </x-page-header>
 
-    @if ($car->photo_url)
-        <img src="{{ $car->photo_url }}" alt="{{ $car->brand }} {{ $car->model }}"
-             class="mb-4" style="max-width: 320px; border-radius: 8px;">
-    @endif
-
-    <dl class="grid grid-cols-2 gap-2 text-sm">
-        <dt class="font-medium text-gray-700">Plate Number</dt>
-        <dd class="font-mono">{{ $car->plate_number ?? 'Not on file' }}</dd>
-
-        <dt class="font-medium text-gray-700">Type</dt>
-        <dd>{{ $car->type }}</dd>
-
-        <dt class="font-medium text-gray-700">Transmission</dt>
-        <dd>{{ ucfirst($car->transmission) }}</dd>
-
-        <dt class="font-medium text-gray-700">Price per Day</dt>
-        <dd>RM {{ number_format($car->price_per_day, 2) }}</dd>
-
-        <dt class="font-medium text-gray-700">Branch</dt>
-        <dd>{{ $car->branch->name ?? 'N/A' }}</dd>
-    </dl>
-
-    <div class="mt-6">
-        <a href="{{ route('admin.cars.edit', $car) }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Edit</a>
-        <a href="{{ route('admin.cars.index') }}" class="ml-2 text-gray-600 hover:text-gray-900">Back to list</a>
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
+        <div class="overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_50%_35%,#1f1f1f_0%,#0b0b0b_70%)] ring-1 ring-line">
+            <x-car-viewer :car="$car" height="h-[440px]" />
+        </div>
+        <div class="space-y-6">
+            <section class="card card-pad">
+                <dl class="grid grid-cols-2 gap-4 text-sm">
+                    <div><dt class="label">Price / day</dt><dd class="text-lg font-semibold">RM {{ number_format($car->price_per_day, 2) }}</dd></div>
+                    <div><dt class="label">Status</dt><dd><x-badge :tone="['available' => 'success', 'rented' => 'info', 'maintenance' => 'warning'][$car->status] ?? 'neutral'">{{ ucfirst($car->status) }}</x-badge>@if ($car->status_changed_at)<p class="mt-1 text-xs text-subtle">for {{ $car->days_in_current_status }} days</p>@endif</dd></div>
+                    <div><dt class="label">Branch</dt><dd>{{ $car->branch?->name }}</dd></div>
+                    <div><dt class="label">Body / gearbox</dt><dd>{{ $car->type }} · <span class="capitalize">{{ strtolower($car->transmission) }}</span></dd></div>
+                    <div><dt class="label">Seats / fuel</dt><dd>{{ $car->seats }} · {{ $car->fuel_type }}</dd></div>
+                    <div><dt class="label">3D model</dt><dd>{{ $car->model_3d ? 'Custom .glb' : 'Generated' }}</dd></div>
+                </dl>
+            </section>
+            <section class="card">
+                <h2 class="px-5 pt-5 font-semibold">Recent bookings</h2>
+                <ul class="mt-3 divide-y divide-line">
+                    @forelse ($car->bookings as $booking)
+                        <li><a href="{{ route('admin.bookings.show', $booking) }}" class="flex items-center justify-between gap-3 px-5 py-3 text-sm hover:bg-white/[0.03]">
+                            <span><span class="block font-medium">{{ $booking->user?->name }}</span><span class="text-xs text-subtle">{{ $booking->start_date->format('d M') }} – {{ $booking->end_date->format('d M Y') }}</span></span>
+                            <x-status-badge :booking="$booking" />
+                        </a></li>
+                    @empty
+                        <li class="px-5 py-8 text-center text-sm text-subtle">No bookings yet.</li>
+                    @endforelse
+                </ul>
+            </section>
+        </div>
     </div>
-</div>
 @endsection
