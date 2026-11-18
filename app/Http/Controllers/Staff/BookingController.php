@@ -25,26 +25,21 @@ class BookingController extends Controller
     {
         $branchId = Auth::user()->branch_id;
 
-        $query = Booking::with(['user', 'cars', 'approvedBy'])
-            ->whereHas('cars', fn ($q) => $q->where('branch_id', $branchId));
+        $branchScope = Booking::whereHas('cars', fn ($q) => $q->where('branch_id', $branchId));
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->whereHas('user', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        $bookings = $query->orderByDesc('created_at')->paginate(15);
+        $bookings = (clone $branchScope)
+            ->with(['user', 'cars', 'approvedBy'])
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->search($request->input('search'))
+            ->orderByDesc('created_at')
+            ->paginate(15)
+            ->withQueryString();
 
         $stats = [
-            'total' => (clone $query)->count(),
-            'pending' => (clone $query)->where('status', 'pending')->count(),
+            'total' => (clone $branchScope)->count(),
+            'pending' => (clone $branchScope)->where('status', 'pending')->count(),
+            'approved' => (clone $branchScope)->where('status', 'approved')->count(),
+            'upcoming' => (clone $branchScope)->where('status', 'approved')->whereDate('start_date', '>=', today())->count(),
         ];
 
         return view('staff.bookings.index', compact('bookings', 'stats'));
@@ -54,7 +49,7 @@ class BookingController extends Controller
     {
         $this->authorizeBranch($booking);
 
-        $booking->load(['user', 'cars.branch', 'approvedBy']);
+        $booking->load(['user', 'cars.branch', 'approvedBy', 'payments' => fn ($q) => $q->latest()]);
 
         return view('staff.bookings.show', compact('booking'));
     }

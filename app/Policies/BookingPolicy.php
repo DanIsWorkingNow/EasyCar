@@ -44,6 +44,21 @@ class BookingPolicy
         return $this->approve($user, $booking);
     }
 
+    public function update(User $user, Booking $booking): bool
+    {
+        return $booking->canBeEditedBy($user);
+    }
+
+    public function cancel(User $user, Booking $booking): bool
+    {
+        return $booking->canBeCancelledBy($user);
+    }
+
+    public function pay(User $user, Booking $booking): bool
+    {
+        return $user->id === $booking->user_id && $booking->canBePaid();
+    }
+
     public function viewDashboard(User $user): bool
     {
         return $user->can('view-dashboard');

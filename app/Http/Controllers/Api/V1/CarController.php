@@ -26,7 +26,7 @@ class CarController extends Controller
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->type))
             ->when($request->filled('transmission'), fn ($q) => $q->where('transmission', $request->transmission))
             ->when($request->filled('brand'), function ($q) use ($request) {
-                $q->whereRaw('LOWER(brand) LIKE ?', ['%' . strtolower($request->brand) . '%']);
+                $q->whereRaw('LOWER(brand) LIKE ?', ['%'.strtolower($request->brand).'%']);
             })
             ->paginate(20);
 
@@ -95,7 +95,7 @@ class CarController extends Controller
             'transmission' => 'required|string|max:255',
             'branch_id' => 'required|exists:branches,id',
             'price_per_day' => 'required|numeric|min:0.01',
-            'plate_number' => 'required|string|max:20|unique:cars,plate_number,' . $car->id,
+            'plate_number' => 'required|string|max:20|unique:cars,plate_number,'.$car->id,
             'photo' => 'nullable|image|max:4096',
         ]);
 

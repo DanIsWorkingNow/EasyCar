@@ -1,105 +1,104 @@
 <?php
 
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\BranchController as AdminBranchController;
 use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\BookingController;
-use App\Http\Controllers\CarController as PublicCarController;
+use App\Http\Controllers\CarController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LandingController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\PaymentWebhookController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Staff\BookingController as StaffBookingController;
 use App\Http\Controllers\Staff\CarController as StaffCarController;
 use App\Http\Controllers\Staff\DashboardController as StaffDashboardController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| CUTOVER (TSD 4.4 step 3) — changes from the pre-cutover routes/web.php:
+| Web routes
+|--------------------------------------------------------------------------
 |
-| 1. ['auth','admin'] / ['auth','staff'] -> ['auth','role:admin'] /
-|    ['auth','role:staff']. 'role:' is registered automatically by
-|    spatie/laravel-permission — no manual alias needed, which is why
-|    AdminMiddleware/StaffMiddleware were deleted.
+| Ordering matters: Laravel matches in registration order, so literal
+| segments (/bookings/available-cars, /admin/bookings/export) must be
+| registered BEFORE the resource routes whose {wildcard} would otherwise
+| swallow them. Both of those routes were unreachable before this revamp
+| for exactly that reason.
 |
-| 2. Removed the stray debug route (`/test-admin`) and the two duplicate
-|    legacy POST /admin/bookings/{id}/approve|reject routes that used to
-|    sit at the bottom of this file — they resolved to the same action as
-|    the PATCH routes already inside the admin group, just with a
-|    different verb and a different route name (admin.bookings.approve vs
-|    bookings.approve), which was confusing leftover routing rather than a
-|    second real feature.
-|
-| 3. Staff approve/reject/bulk-approve routes point at Staff\BookingController
-|    (TD-20 fix), scoped to the staff member's own branch inside the
-|    controller.
 */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// ── Public ────────────────────────────────────────────────────────────
+Route::get('/', LandingController::class)->name('landing');
+Route::get('/cars', [CarController::class, 'index'])->name('cars.index');
+Route::get('/cars/{car}', [CarController::class, 'show'])->name('cars.show');
 
 Auth::routes();
 
-Route::get('/home', [HomeController::class, 'index'])->name('home');
-Route::get('/cars', [PublicCarController::class, 'index'])->name('cars.index');
+// Gateway → server notifications (CSRF-exempt, signature-verified).
+Route::post('/payments/webhook/{gateway}', PaymentWebhookController::class)
+    ->middleware('throttle:120,1')
+    ->where('gateway', '[a-z0-9_-]+')
+    ->name('payments.webhook');
 
-// Customer Bookings (authenticated users only)
-Route::middleware(['auth'])->group(function () {
+// ── Signed-in customers ───────────────────────────────────────────────
+Route::middleware('auth')->group(function () {
+    Route::get('/home', [HomeController::class, 'index'])->name('home');
+
+    Route::get('/bookings/available-cars', [BookingController::class, 'getAvailableCars'])->name('bookings.available-cars');
     Route::resource('bookings', BookingController::class);
-    Route::get('/bookings/available-cars', [BookingController::class, 'getAvailableCars']);
+
+    Route::post('/bookings/{booking}/pay', [PaymentController::class, 'store'])
+        ->middleware('throttle:10,1')
+        ->name('bookings.pay');
+    Route::get('/payments/{payment}/return', [PaymentController::class, 'return'])->name('payments.return');
+    Route::get('/payments/{payment}/status', [PaymentController::class, 'status'])->name('payments.status');
+    Route::get('/payments/{payment}/sandbox', [PaymentController::class, 'sandbox'])->name('payments.sandbox.show');
+    Route::post('/payments/{payment}/sandbox', [PaymentController::class, 'completeSandbox'])->name('payments.sandbox.complete');
+
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
+
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/{id}', [NotificationController::class, 'open'])->name('notifications.open');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 });
 
-// Admin Routes
+// ── Admin console ─────────────────────────────────────────────────────
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
 
-    Route::resource('/cars', AdminCarController::class)->names([
-        'index' => 'admin.cars.index',
-        'create' => 'admin.cars.create',
-        'store' => 'admin.cars.store',
-        'show' => 'admin.cars.show',
-        'edit' => 'admin.cars.edit',
-        'update' => 'admin.cars.update',
-        'destroy' => 'admin.cars.destroy',
-    ]);
+    Route::resource('cars', AdminCarController::class)->names('admin.cars');
+    Route::resource('branches', AdminBranchController::class)->except('show')->names('admin.branches');
+    Route::resource('users', AdminUserController::class)->names('admin.users');
 
-    Route::resource('/bookings', AdminBookingController::class)->names([
-        'index' => 'admin.bookings.index',
-        'create' => 'admin.bookings.create',
-        'store' => 'admin.bookings.store',
-        'show' => 'admin.bookings.show',
-        'edit' => 'admin.bookings.edit',
-        'update' => 'admin.bookings.update',
-        'destroy' => 'admin.bookings.destroy',
-    ]);
-
+    // Literal booking routes before the {booking} resource routes.
     Route::get('/bookings/export', [AdminBookingController::class, 'export'])->name('bookings.export');
     Route::post('/bookings/bulk-approve', [AdminBookingController::class, 'bulkApprove'])->name('bookings.bulk-approve');
+    Route::resource('bookings', AdminBookingController::class)->only(['index', 'show'])->names('admin.bookings');
     Route::patch('/bookings/{booking}/approve', [AdminBookingController::class, 'approve'])->name('bookings.approve');
     Route::patch('/bookings/{booking}/reject', [AdminBookingController::class, 'reject'])->name('bookings.reject');
 
-    Route::resource('/users', AdminUserController::class)->names([
-        'index' => 'admin.users.index',
-        'create' => 'admin.users.create',
-        'store' => 'admin.users.store',
-        'show' => 'admin.users.show',
-        'edit' => 'admin.users.edit',
-        'update' => 'admin.users.update',
-        'destroy' => 'admin.users.destroy',
-    ]);
+    Route::get('/payments', [AdminPaymentController::class, 'index'])->name('admin.payments.index');
+    Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])->name('admin.payments.show');
+    Route::post('/payments/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('admin.payments.refund');
+    Route::post('/payments/{payment}/mark-refunded', [AdminPaymentController::class, 'markRefunded'])->name('admin.payments.mark-refunded');
 });
 
-// Staff Routes
+// ── Staff console (scoped to the staff member's branch) ───────────────
 Route::middleware(['auth', 'role:staff'])->prefix('staff')->group(function () {
     Route::get('/dashboard', [StaffDashboardController::class, 'index'])->name('staff.dashboard');
+    Route::get('/cars', [StaffCarController::class, 'index'])->name('staff.cars.index');
 
-    Route::resource('/cars', StaffCarController::class)->only(['index'])->names([
-        'index' => 'staff.cars.index',
-    ]);
-
+    Route::post('/bookings/bulk-approve', [StaffBookingController::class, 'bulkApprove'])->name('staff.bookings.bulk-approve');
     Route::get('/bookings', [StaffBookingController::class, 'index'])->name('staff.bookings.index');
     Route::get('/bookings/{booking}', [StaffBookingController::class, 'show'])->name('staff.bookings.show');
     Route::patch('/bookings/{booking}/approve', [StaffBookingController::class, 'approve'])->name('staff.bookings.approve');
     Route::patch('/bookings/{booking}/reject', [StaffBookingController::class, 'reject'])->name('staff.bookings.reject');
-    Route::post('/bookings/bulk-approve', [StaffBookingController::class, 'bulkApprove'])->name('staff.bookings.bulk-approve');
 });

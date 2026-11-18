@@ -42,19 +42,40 @@ it('refuses to select a third car', function () {
         ->assertHasErrors('selectedCarIds');
 });
 
-it('creates a booking end-to-end and redirects to bookings.index', function () {
+it('creates a booking end-to-end and redirects to the booking page to pay', function () {
     $car = Car::factory()->create();
     $user = User::factory()->create();
     $this->actingAs($user);
 
-    Livewire::test(CarAvailabilityPicker::class)
+    $component = Livewire::test(CarAvailabilityPicker::class)
         ->set('startDate', now()->addDays(3)->toDateString())
         ->set('endDate', now()->addDays(5)->toDateString())
         ->call('toggleCar', $car->id)
-        ->call('createBooking')
-        ->assertRedirect(route('bookings.index'));
+        ->call('createBooking');
 
-    expect(Booking::where('user_id', $user->id)->exists())->toBeTrue();
+    $booking = Booking::where('user_id', $user->id)->firstOrFail();
+
+    // Revamp: after reserving, the customer lands on the booking page,
+    // which hosts the payment step (was bookings.index before payments).
+    $component->assertRedirect(route('bookings.show', $booking));
+});
+
+it('preselects the car passed from the car detail page', function () {
+    $car = Car::factory()->create();
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CarAvailabilityPicker::class, ['preselectedCarId' => $car->id])
+        ->assertSet('selectedCarIds', [$car->id]);
+});
+
+it('matches the gearbox filter case-insensitively (seed data is lowercase)', function () {
+    Car::factory()->create(['transmission' => 'automatic']);
+    Car::factory()->create(['transmission' => 'Manual']);
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CarAvailabilityPicker::class)
+        ->set('transmission', 'Automatic')
+        ->assertViewHas('cars', fn ($cars) => $cars->count() === 1);
 });
 
 it('rejects submission with no cars selected', function () {

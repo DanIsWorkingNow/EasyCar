@@ -17,10 +17,12 @@ npm ci
 npm run build
 
 php artisan migrate --force
+php artisan storage:link --force   # uploaded car photos and 3D models
 
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+php artisan event:cache
 
 $ACTIVATE_RELEASE()
 $RESTART_QUEUES()

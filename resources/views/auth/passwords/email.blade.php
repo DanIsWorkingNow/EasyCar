@@ -1,47 +1,14 @@
-@extends('layouts.app')
+@extends('layouts.auth')
+
+@section('title', 'Reset password')
 
 @section('content')
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">{{ __('Reset Password') }}</div>
-
-                <div class="card-body">
-                    @if (session('status'))
-                        <div class="alert alert-success" role="alert">
-                            {{ session('status') }}
-                        </div>
-                    @endif
-
-                    <form method="POST" action="{{ route('password.email') }}">
-                        @csrf
-
-                        <div class="row mb-3">
-                            <label for="email" class="col-md-4 col-form-label text-md-end">{{ __('Email Address') }}</label>
-
-                            <div class="col-md-6">
-                                <input id="email" type="email" class="form-control @error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" required autocomplete="email" autofocus>
-
-                                @error('email')
-                                    <span class="invalid-feedback" role="alert">
-                                        <strong>{{ $message }}</strong>
-                                    </span>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div class="row mb-0">
-                            <div class="col-md-6 offset-md-4">
-                                <button type="submit" class="btn btn-primary">
-                                    {{ __('Send Password Reset Link') }}
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+    <h1 class="text-3xl font-bold">Forgot your password?</h1>
+    <p class="mt-2 text-sm text-mute">Enter your email and we'll send you a link to choose a new one.</p>
+    <form method="POST" action="{{ route('password.email') }}" class="mt-7 space-y-4">
+        @csrf
+        <x-field name="email" type="email" label="Email" required autofocus autocomplete="email" class="[&_.input]:h-12" />
+        <button class="btn btn-primary btn-lg w-full">Email reset link</button>
+    </form>
+    <p class="mt-8 text-mute"><a href="{{ route('login') }}" class="inline-flex items-center gap-1.5 hover:text-white"><x-icon name="arrow-left" class="size-4" /> Back to sign in</a></p>
 @endsection

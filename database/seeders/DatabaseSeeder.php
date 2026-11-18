@@ -2,18 +2,16 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Base data for any environment. Demo bookings/payments are opt-in:
+     *   php artisan db:seed --class=Database\\Seeders\\BookingDemoSeeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
         $this->call([
             BranchSeeder::class,
             CarSeeder::class,

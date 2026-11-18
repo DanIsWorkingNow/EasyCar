@@ -5,15 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BookingResource;
 use App\Models\Booking;
-use App\Models\Car;
 use App\Notifications\BookingConfirmed;
-use App\Services\BookingAvailabilityService;
-use Carbon\Carbon;
+use App\Services\BookingCreationService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 
 /**
  * TSD Section 8.5. Every write path here goes through the same model
@@ -58,60 +54,20 @@ class BookingController extends Controller
         return BookingResource::collection($query->orderByDesc('created_at')->paginate(15));
     }
 
-    public function store(Request $request, BookingAvailabilityService $availability)
+    public function store(Request $request, BookingCreationService $bookings)
     {
         $validated = $request->validate([
             'start_date' => 'required|date|after_or_equal:'.now()->addDays(2)->toDateString(),
             'end_date' => 'required|date|after:start_date',
             'cars' => 'required|array|min:1|max:2',
-            'cars.*' => 'exists:cars,id',
+            'cars.*' => 'integer|exists:cars,id',
         ]);
 
-        foreach ($validated['cars'] as $carId) {
-            if ($availability->hasConflict($carId, $validated['start_date'], $validated['end_date'])) {
-                throw ValidationException::withMessages([
-                    'cars' => ['One or more selected cars are not available for these dates.'],
-                ]);
-            }
-        }
+        // Availability, the per-customer car limit and pricing all live in
+        // BookingCreationService, shared with the web and Livewire flows.
+        $booking = $bookings->create($request->user(), $validated['cars'], $validated['start_date'], $validated['end_date']);
 
-        $totalDays = Carbon::parse($validated['start_date'])->diffInDays($validated['end_date']) + 1;
-
-        $booking = DB::transaction(function () use ($request, $validated, $totalDays) {
-            $booking = Booking::create([
-                'user_id' => $request->user()->id,
-                'start_date' => $validated['start_date'],
-                'end_date' => $validated['end_date'],
-                'total_days' => $totalDays,
-                'status' => 'pending',
-                'total_price' => 0,
-            ]);
-
-            $totalPrice = 0;
-            foreach ($validated['cars'] as $carId) {
-                $car = Car::findOrFail($carId);
-                $price = $car->price_per_day * $totalDays;
-                $totalPrice += $price;
-
-                $booking->cars()->attach($carId, [
-                    'rental_start' => $validated['start_date'],
-                    'rental_end' => $validated['end_date'],
-                    'quantity' => 1,
-                    'price' => $price,
-                ]);
-            }
-
-            $booking->update(['total_price' => $totalPrice]);
-
-            return $booking;
-        });
-
-        $booking->load('cars');
-
-        // Requires Level 3's Notifications class; remove this line if Level 3 isn't applied yet.
-        if (class_exists(BookingConfirmed::class)) {
-            $request->user()->notify(new BookingConfirmed($booking));
-        }
+        $request->user()->notify(new BookingConfirmed($booking));
 
         return (new BookingResource($booking))->response()->setStatusCode(201);
     }
@@ -123,18 +79,27 @@ class BookingController extends Controller
         return new BookingResource($booking->load(['user', 'cars', 'approvedBy']));
     }
 
-    public function update(Request $request, Booking $booking)
+    public function update(Request $request, Booking $booking, BookingCreationService $bookings)
     {
         abort_unless($booking->user_id === $request->user()->id, 403);
-        abort_unless($booking->isPending() && $booking->start_date->isFuture(), 422, 'This booking can no longer be edited.');
+        abort_unless($booking->canBeEditedBy($request->user()), 422, 'This booking can no longer be edited.');
 
         $validated = $request->validate([
             'start_date' => 'required|date|after_or_equal:'.now()->addDays(2)->toDateString(),
             'end_date' => 'required|date|after:start_date',
+            'cars' => 'sometimes|array|min:1|max:2',
+            'cars.*' => 'integer|exists:cars,id',
         ]);
 
-        $totalDays = Carbon::parse($validated['start_date'])->diffInDays($validated['end_date']) + 1;
-        $booking->update(array_merge($validated, ['total_days' => $totalDays]));
+        // FIX: re-dates the pivot rows and re-prices too — previously only
+        // the booking row's dates moved, so availability checks kept using
+        // the old rental window and the old price was still charged.
+        $bookings->update(
+            $booking,
+            $validated['cars'] ?? $booking->cars->pluck('id')->all(),
+            $validated['start_date'],
+            $validated['end_date'],
+        );
 
         return new BookingResource($booking->fresh(['user', 'cars']));
     }
@@ -142,9 +107,11 @@ class BookingController extends Controller
     public function destroy(Request $request, Booking $booking)
     {
         abort_unless($booking->user_id === $request->user()->id, 403);
-        abort_unless($booking->start_date->isFuture(), 422, 'Cannot cancel a booking that has already started.');
+        abort_unless($booking->canBeCancelledBy($request->user()), 422, 'This booking can no longer be cancelled.');
 
-        $booking->delete(); // soft delete — see Level 1 kit 1's SoftDeletes fix
+        // Cancels (and refunds when paid) rather than soft-deleting, so the
+        // booking stays in the customer's history and frees the car.
+        $booking->cancel($request->user(), $request->input('reason'));
 
         return response()->json(['data' => ['message' => 'Booking cancelled.']]);
     }

@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Enums\PaymentStatus;
 use App\Models\Booking;
 use App\Models\Car;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Demo data for the Level 2 dashboard (KPI cards, trend chart, branch
@@ -81,8 +84,27 @@ class BookingDemoSeeder extends Seeder
                 $attributes['rejection_reason'] = $status === 'rejected' ? 'Car unavailable for the requested dates.' : null;
             }
 
+            // Payments (sandbox gateway): everything that went ahead was
+            // paid; rejected bookings were paid and then refunded.
+            $attributes['payment_status'] = $status === 'rejected' ? 'refunded' : 'paid';
+
             $booking = Booking::create($attributes);
             $booking->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();
+
+            $paidAt = $createdAt->copy()->addMinutes(rand(2, 25));
+            Payment::create([
+                'booking_id' => $booking->id,
+                'user_id' => $booking->user_id,
+                'gateway' => 'sandbox',
+                'gateway_reference' => 'sbx_'.Str::lower(Str::random(24)),
+                'amount' => $totalPrice,
+                'refunded_amount' => $status === 'rejected' ? $totalPrice : 0,
+                'currency' => 'MYR',
+                'status' => $status === 'rejected' ? PaymentStatus::Refunded : PaymentStatus::Paid,
+                'paid_at' => $paidAt,
+                'refunded_at' => $status === 'rejected' ? $paidAt->copy()->addHours(rand(2, 30)) : null,
+                'meta' => $status === 'rejected' ? ['refund_reason' => 'Booking rejected'] : null,
+            ])->forceFill(['created_at' => $createdAt, 'updated_at' => $paidAt])->save();
 
             foreach ($pickedCars as $car) {
                 $booking->cars()->attach($car->id, [

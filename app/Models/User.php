@@ -5,6 +5,8 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -47,14 +49,50 @@ class User extends Authenticatable
         ];
     }
 
-    public function bookings()
+    /** @return HasMany<Booking, $this> */
+    public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
     }
 
-    // app/Models/User.php
-    public function branch()
+    /** @return HasMany<Payment, $this> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /** @return BelongsTo<Branch, $this> */
+    public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole('admin');
+    }
+
+    public function isStaff(): bool
+    {
+        return $this->hasRole('staff');
+    }
+
+    /** Route of the operations console this user may use, if any. */
+    public function consoleRoute(): ?string
+    {
+        return match (true) {
+            $this->isAdmin() => 'admin.dashboard',
+            $this->isStaff() => 'staff.dashboard',
+            default => null,
+        };
+    }
+
+    public function getInitialsAttribute(): string
+    {
+        return collect(preg_split('/\s+/', trim((string) $this->name)))
+            ->filter()
+            ->take(2)
+            ->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))
+            ->implode('') ?: '?';
     }
 }

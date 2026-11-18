@@ -5,7 +5,102 @@ integration session and grouped in [Keep a Changelog](https://keepachangelog.com
 style (`Added` / `Changed` / `Fixed`). Entries are reverse-chronological.
 Commit hashes refer to `main`.
 
-## [Unreleased] — 2026-08-21
+## [Unreleased] — 2026-11-18
+
+### Production revamp — cinematic UI, 3D showroom, payment gateway framework
+A full redesign of every page and a production-hardening pass across the
+backend.
+
+### Added
+- **Payment gateway framework** (`app/Payments`, `config/payments.php`): the
+  `PaymentGateway` contract, a `PaymentManager` driver resolver, and drivers
+  for **Stripe Checkout** (cards/FPX/GrabPay, API refunds), **Billplz** (FPX)
+  and **ToyyibPay** (FPX/cards), plus a **sandbox** gateway for local use and
+  demos. Uses Laravel's HTTP client, so there are no new Composer
+  dependencies.
+  - `payments` and `payment_events` tables. Webhooks go to
+    `POST /payments/webhook/{gateway}` (CSRF-exempt). They are verified by
+    HMAC for Stripe/Billplz/sandbox and by server-side re-confirmation for
+    ToyyibPay, logged idempotently on `(gateway, event_id)`, and applied
+    under a row lock.
+  - State rules: a paid payment is never downgraded by a late event, and
+    duplicate payments or payments for an inactive booking are refunded
+    automatically.
+  - Rejecting or cancelling a paid booking refunds it. Gateways without a
+    refund API flag the payment `refund_pending` for an admin to confirm.
+  - `bookings:expire-unpaid` (scheduled every 5 min) releases cars held by
+    unpaid bookings after `PAYMENTS_HOLD_MINUTES`.
+  - `PaymentReceived` / `PaymentRefunded` notifications; an
+    **Admin → Payments** console with totals, filters, refunds, manual-refund
+    confirmation and the webhook event log.
+- **3D showroom** (`resources/js/car-viewer`): a three.js viewer with orbit,
+  zoom, paint colours, camera presets, headlights and fullscreen. It builds
+  a procedural model per body type, or loads an admin-uploaded `.glb`
+  (new `cars.model_3d`). The viewer is lazy-loaded when it scrolls into view,
+  pauses when off-screen, respects reduced motion, and falls back to the
+  photo without WebGL.
+- **Cinematic dark UI**: Tailwind 4 design tokens, a Blade component library
+  (`x-car-tile`, `x-car-row`, `x-car-viewer`, `x-field`, `x-modal`, …), a
+  hero billboard, scrolling rows and a ranked Top 10. Also new console,
+  auth and error layouts, and self-hosted Bebas Neue and Inter fonts.
+- New pages: car detail (3D, specs, 6-week availability calendar), booking
+  detail with the payment step and timeline, payment return/processing,
+  sandbox checkout, customer hub, account settings, notifications inbox,
+  admin booking detail (was an empty file), Admin → Branches CRUD, and
+  branded 403/404/419/429/500/503 pages.
+- Customer-facing booking references (`EC-XXXXXXXX`), customer cancellation
+  with a reason, car showroom fields (year, seats, fuel, colour,
+  description, featured), and branch address/phone.
+- `SecurityHeaders` middleware, trusted-proxy support, CSV formula-injection
+  escaping on exports, and a CI job that builds front-end assets.
+- 43 new Pest tests (84 total): payment flows, every gateway driver,
+  lifecycle regressions, and smoke tests rendering every page as each role.
+
+### Fixed
+- **`npm ci` failed on Linux** (including the Forge deploy target):
+  `package.json` hard-depended on `lightningcss-win32-x64-msvc` and ~80 stray
+  transitive packages. Cleaned it up to the real dependencies.
+- **Rejected and cancelled bookings blocked their car forever.** The
+  availability query ignored status.
+- **Editing a booking never re-priced it.** The web path re-inserted pivot
+  rows with no price. The API path moved only the booking's dates, leaving
+  the pivot rental window (used for availability) stale. Both now go
+  through `BookingCreationService::update()`.
+- A booking made with exactly the minimum 2 days' notice could never be
+  approved, because `days_until_start` counted from the current time.
+- `GET /admin/bookings/export` and `GET /bookings/available-cars` were
+  swallowed by `{booking}` wildcard routes. The admin booking resource also
+  exposed unimplemented create/edit/update/destroy routes (500s).
+- Admin booking filters and "View" links pointed at the *customer* routes.
+- The two-car-per-customer limit was enforced only by the legacy form, not
+  by the Livewire flow or the API.
+- The gearbox filter never matched seeded cars (case mismatch).
+- Self-registered users were never given the `customer` role.
+- Customer cancellation soft-deleted the booking instead of setting
+  `status=cancelled`.
+- Exception messages were echoed to customers on booking errors.
+- `bookings.show` and `admin.users.show` views were missing (500s).
+- Removed the stray `app/easycar.lnk` Windows shortcut. Downscaled
+  `bezza.jpeg` from 6246 px / 1.2 MB to 1600 px / 150 KB.
+
+### Changed
+- Bootstrap (CDN CSS + JS) and Sass were removed; the UI is Tailwind 4 +
+  Alpine (via Livewire) only, built with `@tailwindcss/vite`.
+- ApexCharts and three.js are code-split and loaded on demand. The main JS
+  bundle is about 63 KB.
+- After reserving, customers land on the booking page to pay. The picker
+  test now expects `bookings.show` instead of `bookings.index`.
+- `/home` redirects admins and staff to their console.
+- `UserSeeder`, `BranchSeeder` and `CarSeeder` are idempotent. The demo
+  seeder now also creates payments.
+
+**Upgrade:** `composer install && npm ci && npm run build && php artisan migrate`.
+Set payment environment variables (see `.env.example`) and make sure the
+scheduler runs.
+
+---
+
+## Rate Limit Kit — 2026-08-21 (`13c6423`)
 
 ### Rate Limit Kit — routing fix + tiered throttling
 Integrated `EasyCar_RateLimit_Kit`. Fixes TD-23 (`routes/api.php` was never
@@ -75,7 +170,7 @@ up to the modern minimal skeleton).
 **Verified:** full 41-test suite green, Pint clean, Larastan shows no new
 findings (57 pre-existing, same file set as before), live curl confirms
 login throttling (429 on the 6th attempt) and `/api/v1/bookings` returning
-401 not 404. *(Not yet committed.)*
+401 not 404.
 
 ---
 

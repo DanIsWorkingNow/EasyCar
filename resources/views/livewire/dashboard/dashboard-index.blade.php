@@ -1,38 +1,33 @@
-<div wire:poll.15s="$refresh" class="max-w-7xl mx-auto p-6">
-    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">
-            {{ $isAdmin ? 'Admin' : 'Staff' }} Booking Dashboard
-        </h1>
+<div wire:poll.15s="$refresh">
+    <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            <p class="eyebrow">{{ $isAdmin ? 'All branches' : (auth()->user()->branch?->name ?? 'Your branch') }}</p>
+            <h1 class="display mt-2 text-5xl">{{ $isAdmin ? 'Business overview' : 'Branch overview' }}</h1>
+            <p class="mt-1 flex items-center gap-2 text-sm text-subtle"><span class="size-2 animate-pulse rounded-full bg-match"></span> Live · refreshes every 15 seconds</p>
+        </div>
 
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2">
             @if ($isAdmin)
-                <select wire:change="setBranch($event.target.value ? $event.target.value : null)"
-                        class="border-gray-300 rounded-md shadow-sm text-sm">
-                    <option value="">All Branches</option>
+                <select wire:change="setBranch($event.target.value ? $event.target.value : null)" class="input w-auto" aria-label="Branch">
+                    <option value="">All branches</option>
                     @foreach ($this->branches as $branch)
                         <option value="{{ $branch->id }}" @selected($branchId == $branch->id)>{{ $branch->name }}</option>
                     @endforeach
                 </select>
             @endif
-
-            <div class="flex rounded-md shadow-sm" role="group">
+            <div class="inline-flex rounded-md bg-ink-700 p-1 ring-1 ring-white/10" role="group" aria-label="Period">
                 @foreach ([7, 30, 90] as $days)
-                    <button type="button" wire:click="setPeriod({{ $days }})"
-                            class="px-3 py-1.5 text-sm border {{ $period === $days ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700' }}">
-                        {{ $days }}d
-                    </button>
+                    <button type="button" wire:click="setPeriod({{ $days }})" aria-pressed="{{ $period === $days ? 'true' : 'false' }}"
+                            class="rounded px-3 py-1.5 text-sm font-semibold transition {{ $period === $days ? 'bg-white text-black' : 'text-mute hover:text-white' }}">{{ $days }}d</button>
                 @endforeach
             </div>
         </div>
     </div>
 
-    {{-- Each child receives the parent's current scope as props and re-renders
-         independently — Livewire diffs only what actually changed. --}}
     <livewire:dashboard.kpi-cards :branch-id="$branchId" :period="$period" :key="'kpi-'.$branchId.'-'.$period" />
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div class="mt-6 grid gap-6 {{ $isAdmin ? 'xl:grid-cols-[1.5fr_1fr]' : '' }}">
         <livewire:dashboard.booking-trend-chart :branch-id="$branchId" :period="$period" :key="'trend-'.$branchId.'-'.$period" />
-
         @if ($isAdmin)
             <livewire:dashboard.branch-comparison-table :period="$period" :key="'branches-'.$period" />
         @endif
