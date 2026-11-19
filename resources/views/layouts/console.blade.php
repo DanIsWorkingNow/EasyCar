@@ -4,20 +4,24 @@
     $nav = $isAdmin
         ? [
             ['Overview', 'admin.dashboard', 'grid', 'admin.dashboard'],
+            ['Operations', 'ops.board', 'car', 'ops.*'],
             ['Bookings', 'admin.bookings.index', 'calendar', 'admin.bookings.*'],
             ['Payments', 'admin.payments.index', 'card', 'admin.payments.*'],
-            ['Fleet', 'admin.cars.index', 'car', 'admin.cars.*'],
+            ['Fleet', 'admin.cars.index', 'cube', 'admin.cars.*'],
             ['Branches', 'admin.branches.index', 'building', 'admin.branches.*'],
             ['Users', 'admin.users.index', 'users', 'admin.users.*'],
         ]
         : [
             ['Overview', 'staff.dashboard', 'grid', 'staff.dashboard'],
+            ['Operations', 'ops.board', 'car', 'ops.*'],
             ['Bookings', 'staff.bookings.index', 'calendar', 'staff.bookings.*'],
-            ['Branch fleet', 'staff.cars.index', 'car', 'staff.cars.*'],
+            ['Branch fleet', 'staff.cars.index', 'cube', 'staff.cars.*'],
         ];
     $pending = \App\Models\Booking::pending()
         ->when(! $isAdmin, fn ($q) => $q->whereHas('cars', fn ($c) => $c->where('branch_id', $user->branch_id)))
         ->count();
+    $opsSummary = ($isAdmin || $user->branch_id) ? app(\App\Services\Rentals\RentalOperationsService::class)->summary($isAdmin ? null : $user->branch_id) : [];
+    $opsDue = ($opsSummary['overdue'] ?? 0) + ($opsSummary['pickups_today'] ?? 0) + ($opsSummary['returns_today'] ?? 0);
 @endphp
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="bg-ink">
@@ -49,6 +53,8 @@
                     <span class="flex-1">{{ $label }}</span>
                     @if ($label === 'Bookings' && $pending)
                         <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-300">{{ $pending }}</span>
+                    @elseif ($label === 'Operations' && $opsDue)
+                        <span class="rounded-full px-2 py-0.5 text-[11px] font-bold {{ ($opsSummary['overdue'] ?? 0) ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/15 text-emerald-300' }}">{{ $opsDue }}</span>
                     @endif
                 </a>
             @endforeach

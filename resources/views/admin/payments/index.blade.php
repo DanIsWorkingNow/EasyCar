@@ -40,7 +40,7 @@
                 @forelse ($payments as $payment)
                     <tr>
                         <td class="whitespace-nowrap text-mute">{{ $payment->created_at->format('d M Y, g:i A') }}</td>
-                        <td class="font-mono text-xs">@if ($payment->booking)<a href="{{ route('admin.bookings.show', $payment->booking) }}" class="hover:underline">{{ $payment->booking->reference }}</a>@endif</td>
+                        <td class="font-mono text-xs">@if ($payment->booking)<a href="{{ route('admin.bookings.show', $payment->booking) }}" class="hover:underline">{{ $payment->booking->reference }}</a>@endif<span class="block font-sans text-subtle">{{ $payment->purposeLabel() }}</span></td>
                         <td><p class="font-medium">{{ $payment->user?->name }}</p><p class="text-xs text-subtle">{{ $payment->user?->email }}</p></td>
                         <td class="text-mute">{{ $payment->gatewayLabel() }}</td>
                         <td><x-payment-badge :status="$payment->status" /></td>

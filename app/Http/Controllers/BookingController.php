@@ -64,11 +64,11 @@ class BookingController extends Controller
     {
         $this->authorize('view', $booking);
 
-        $booking->load(['cars.branch', 'payments' => fn ($q) => $q->latest()]);
+        $booking->load(['cars.branch', 'payments' => fn ($q) => $q->latest(), 'inspections', 'charges']);
 
         return view('bookings.show', [
             'booking' => $booking,
-            'gateways' => $booking->canBePaid() ? $gateways->available() : [],
+            'gateways' => ($booking->canBePaid() || $booking->canPayCharges()) ? $gateways->available() : [],
             'defaultGateway' => config('payments.default'),
         ]);
     }

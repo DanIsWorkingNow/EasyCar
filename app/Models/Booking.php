@@ -67,6 +67,10 @@ class Booking extends Model
         'payment_status',
         'cancelled_at',
         'cancellation_reason',
+        'picked_up_at',
+        'returned_at',
+        'completed_at',
+        'overdue_notified_at',
     ];
 
     protected $attributes = [
@@ -78,6 +82,10 @@ class Booking extends Model
         'end_date' => 'date',
         'approved_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'picked_up_at' => 'datetime',
+        'returned_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'overdue_notified_at' => 'datetime',
         'total_price' => 'float',
         'payment_status' => BookingPaymentStatus::class,
     ];
@@ -144,6 +152,18 @@ class Booking extends Model
         return $this->hasOne(Payment::class)->ofMany(['id' => 'max'], function (Builder $q) {
             $q->whereIn('status', [PaymentStatus::Paid->value, PaymentStatus::Refunded->value, PaymentStatus::RefundPending->value]);
         });
+    }
+
+    /** @return HasMany<VehicleInspection, $this> */
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(VehicleInspection::class);
+    }
+
+    /** @return HasMany<BookingCharge, $this> */
+    public function charges(): HasMany
+    {
+        return $this->hasMany(BookingCharge::class);
     }
 
     public function calculateTotalPrice(): float
@@ -214,6 +234,65 @@ class Booking extends Model
         return $this->cars->map(fn ($c) => "{$c->brand} {$c->model}")->implode(', ');
     }
 
+    // ── Trip lifecycle (Phase 2: rental operations) ──────────────────
+
+    /** When the car is handed over: start date at the configured pickup time. */
+    public function pickupDueAt(): Carbon
+    {
+        return $this->start_date->copy()->setTimeFromTimeString((string) config('rentals.pickup_time', '10:00'));
+    }
+
+    /** When the car is due back: end date at the configured return time. */
+    public function returnDueAt(): Carbon
+    {
+        return $this->end_date->copy()->setTimeFromTimeString((string) config('rentals.return_time', '18:00'));
+    }
+
+    public function isOnTrip(): bool
+    {
+        return $this->isApproved() && $this->picked_up_at !== null && $this->completed_at === null;
+    }
+
+    public function isOverdue(): bool
+    {
+        return $this->isOnTrip()
+            && now()->greaterThan($this->returnDueAt()->addMinutes((int) config('rentals.late_grace_minutes', 60)));
+    }
+
+    /**
+     * Where the trip is, independent of the approval status.
+     *
+     * @return array{key: string, label: string, tone: string}|null
+     */
+    public function tripMeta(): ?array
+    {
+        return match (true) {
+            $this->isCompleted() => ['key' => 'completed', 'label' => 'Trip completed', 'tone' => 'info'],
+            $this->isOverdue() => ['key' => 'overdue', 'label' => 'Return overdue', 'tone' => 'danger'],
+            $this->isOnTrip() => ['key' => 'on_trip', 'label' => 'On trip', 'tone' => 'success'],
+            $this->isApproved() => ['key' => 'awaiting_pickup', 'label' => 'Awaiting pick-up', 'tone' => 'warning'],
+            default => null,
+        };
+    }
+
+    public function inspectionFor(int $carId, string $type): ?VehicleInspection
+    {
+        return $this->inspections->first(fn (VehicleInspection $i) => $i->car_id === $carId && $i->type === $type);
+    }
+
+    /** Sum of extra charges that are neither paid nor waived. */
+    public function outstandingCharges(): float
+    {
+        return round((float) $this->charges
+            ->filter(fn (BookingCharge $c) => ! $c->isPaid() && ! $c->isVoided())
+            ->sum('amount'), 2);
+    }
+
+    public function canPayCharges(): bool
+    {
+        return (bool) config('payments.enabled') && $this->outstandingCharges() > 0;
+    }
+
     public function canBeApproved(): bool
     {
         return $this->isPending() && $this->days_until_start >= 2;
@@ -236,6 +315,7 @@ class Booking extends Model
     {
         return $user->id === $this->user_id
             && in_array($this->status, ['pending', 'approved'], true)
+            && $this->picked_up_at === null
             && $this->start_date->isFuture();
     }
 

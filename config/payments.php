@@ -63,6 +63,14 @@ return [
             'sandbox' => env('TOYYIBPAY_SANDBOX', true),
         ],
 
+        // Payments taken in person at a branch and recorded by staff
+        // (pick-up and return handovers). Never offered at online checkout.
+        'counter' => [
+            'enabled' => false,
+            'label' => 'Paid at branch',
+            'description' => 'Cash, card terminal or bank transfer at the counter.',
+        ],
+
         // Built-in simulated gateway for local development, demos and
         // automated tests. Never enable it in production.
         'sandbox' => [

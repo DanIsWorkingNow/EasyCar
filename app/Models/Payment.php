@@ -15,10 +15,20 @@ use Illuminate\Support\Str;
  */
 class Payment extends Model
 {
+    /** The rental itself. */
+    public const PURPOSE_BOOKING = 'booking';
+
+    /** Extras billed after the trip (late return, fuel, damage…). */
+    public const PURPOSE_CHARGES = 'charges';
+
     protected $fillable = [
-        'uuid', 'booking_id', 'user_id', 'gateway', 'gateway_reference', 'amount',
+        'uuid', 'booking_id', 'user_id', 'purpose', 'gateway', 'gateway_reference', 'amount',
         'refunded_amount', 'currency', 'status', 'checkout_url', 'failure_reason',
         'meta', 'paid_at', 'refunded_at',
+    ];
+
+    protected $attributes = [
+        'purpose' => self::PURPOSE_BOOKING,
     ];
 
     protected $casts = [
@@ -58,6 +68,22 @@ class Payment extends Model
     public function events(): HasMany
     {
         return $this->hasMany(PaymentEvent::class);
+    }
+
+    /** @return HasMany<BookingCharge, $this> */
+    public function charges(): HasMany
+    {
+        return $this->hasMany(BookingCharge::class);
+    }
+
+    public function isForCharges(): bool
+    {
+        return $this->purpose === self::PURPOSE_CHARGES;
+    }
+
+    public function purposeLabel(): string
+    {
+        return $this->isForCharges() ? 'Extra charges' : 'Rental';
     }
 
     /** Amount in the smallest currency unit (sen), as gateways expect. */

@@ -52,17 +52,20 @@
             @endforeach
         </section>
 
+        @include('partials.booking-operations')
+
         @if ($booking->payments->isNotEmpty())
             <section class="card">
                 <h2 class="px-5 pt-5 font-semibold">Payments</h2>
                 <div class="overflow-x-auto">
                     <table class="table-ec mt-3">
-                        <thead><tr><th>Date</th><th>Gateway</th><th>Reference</th><th>Status</th><th class="text-right">Amount</th></tr></thead>
+                        <thead><tr><th>Date</th><th>For</th><th>Gateway</th><th>Reference</th><th>Status</th><th class="text-right">Amount</th></tr></thead>
                         <tbody>
                             @foreach ($booking->payments as $payment)
                                 <tr>
                                     <td class="text-mute">{{ $payment->created_at->format('d M, g:i A') }}</td>
-                                    <td>{{ $payment->gatewayLabel() }}</td>
+                                    <td class="text-mute">{{ $payment->purposeLabel() }}</td>
+                                    <td>{{ $payment->gatewayLabel() }}@if (($payment->meta['method'] ?? null) && $payment->gateway === 'counter')<span class="block text-xs text-subtle">{{ \App\Payments\Gateways\CounterGateway::METHODS[$payment->meta['method']] ?? '' }}</span>@endif</td>
                                     <td class="font-mono text-xs">@if ($paymentRoute ?? null)<a href="{{ route($paymentRoute, $payment) }}" class="hover:underline">{{ Str::limit($payment->gateway_reference, 22) }}</a>@else{{ Str::limit($payment->gateway_reference, 22) }}@endif</td>
                                     <td><x-payment-badge :status="$payment->status" /></td>
                                     <td class="text-right font-medium">RM {{ number_format($payment->amount, 2) }}</td>

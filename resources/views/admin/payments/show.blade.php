@@ -4,7 +4,7 @@
 @section('breadcrumb', 'Admin console / Payments / '.Str::limit($payment->uuid, 8, ''))
 
 @section('content')
-    <x-page-header eyebrow="Payment" :title="$payment->currency.' '.number_format($payment->amount, 2)" :subtitle="$payment->gatewayLabel().' · '.$payment->created_at->format('d M Y, g:i A')" :back="route('admin.payments.index')">
+    <x-page-header eyebrow="Payment" :title="$payment->currency.' '.number_format($payment->amount, 2)" :subtitle="$payment->purposeLabel().' · '.$payment->gatewayLabel().' · '.$payment->created_at->format('d M Y, g:i A')" :back="route('admin.payments.index')">
         <x-slot:actions>
             @if ($payment->isPaid())
                 <button type="button" class="btn btn-danger" x-data @click="$dispatch('open-modal', 'refund')"><x-icon name="rotate" class="size-4" /> Refund</button>
@@ -22,6 +22,9 @@
                     <div><dt class="label">Booking</dt><dd class="font-mono">@if ($payment->booking)<a href="{{ route('admin.bookings.show', $payment->booking) }}" class="hover:underline">{{ $payment->booking->reference }}</a>@endif</dd></div>
                     <div><dt class="label">Gateway reference</dt><dd class="font-mono text-xs break-all">{{ $payment->gateway_reference ?? '—' }}</dd></div>
                     <div><dt class="label">Internal ID</dt><dd class="font-mono text-xs break-all">{{ $payment->uuid }}</dd></div>
+                    @if ($payment->gateway === 'counter')
+                        <div><dt class="label">Taken at counter</dt><dd class="text-sm">{{ \App\Payments\Gateways\CounterGateway::METHODS[$payment->meta['method'] ?? ''] ?? '—' }} · by {{ $payment->meta['recorded_by_name'] ?? 'staff' }}</dd></div>
+                    @endif
                     <div><dt class="label">Paid at</dt><dd>{{ $payment->paid_at?->format('d M Y, g:i:s A') ?? '—' }}</dd></div>
                     <div><dt class="label">Refunded</dt><dd>{{ $payment->refunded_amount > 0 ? $payment->currency.' '.number_format($payment->refunded_amount, 2).' on '.$payment->refunded_at?->format('d M Y') : '—' }}</dd></div>
                     @if ($payment->failure_reason)<div class="sm:col-span-2"><dt class="label">Failure reason</dt><dd class="text-sm text-red-300">{{ $payment->failure_reason }}</dd></div>@endif

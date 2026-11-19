@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Enums\BookingPaymentStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Booking;
+use App\Models\BookingCharge;
 use App\Models\Payment;
 use App\Models\PaymentEvent;
+use App\Models\User;
 use App\Notifications\PaymentReceived;
 use App\Notifications\PaymentRefunded;
 use App\Payments\Data\GatewayResult;
@@ -16,6 +18,7 @@ use App\Payments\PaymentManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Orchestrates payments independently of any one gateway:
@@ -44,24 +47,110 @@ class PaymentService
             throw new PaymentException('This booking can no longer be paid online.');
         }
 
+        return $this->openCheckout($booking, $gatewayName, Payment::PURPOSE_BOOKING, (float) $booking->total_price);
+    }
+
+    /**
+     * Hosted checkout for the booking's outstanding extra charges (late
+     * return, fuel, damage…). The charge ids are snapshotted so the payment
+     * settles exactly what the customer was shown.
+     *
+     * @throws PaymentException
+     */
+    public function startChargesCheckout(Booking $booking, string $gatewayName): Payment
+    {
+        $booking->loadMissing('charges');
+
+        if (! $booking->canPayCharges()) {
+            throw new PaymentException('There are no outstanding charges to pay.');
+        }
+
+        $chargeIds = $booking->charges->filter(fn ($c) => ! $c->isPaid() && ! $c->isVoided())->pluck('id')->values()->all();
+
+        return $this->openCheckout($booking, $gatewayName, Payment::PURPOSE_CHARGES, $booking->outstandingCharges(), ['charge_ids' => $chargeIds]);
+    }
+
+    /**
+     * Record money taken in person at a branch (cash, card terminal, bank
+     * transfer) — for the rental itself at pick-up, or for extras at return.
+     *
+     * @throws PaymentException
+     */
+    public function recordCounterPayment(Booking $booking, string $purpose, string $method, ?string $reference, User $staff): Payment
+    {
+        return DB::transaction(function () use ($booking, $purpose, $method, $reference, $staff) {
+            $booking = Booking::withTrashed()->whereKey($booking->id)->lockForUpdate()->firstOrFail();
+            $booking->load('charges');
+
+            $outstanding = $purpose === Payment::PURPOSE_CHARGES
+                ? $booking->charges->filter(fn ($c) => ! $c->isPaid() && ! $c->isVoided())
+                : collect();
+
+            $amount = match ($purpose) {
+                Payment::PURPOSE_BOOKING => $booking->isPaid() ? 0.0 : (float) $booking->total_price,
+                Payment::PURPOSE_CHARGES => round((float) $outstanding->sum('amount'), 2),
+                default => throw new PaymentException('Unknown payment purpose.'),
+            };
+
+            if ($amount <= 0) {
+                throw new PaymentException('Nothing is outstanding.');
+            }
+
+            // Any checkout still open online for the same thing is now moot.
+            $booking->payments()->where('purpose', $purpose)->where('status', PaymentStatus::Pending->value)->update([
+                'status' => PaymentStatus::Cancelled->value,
+                'failure_reason' => 'Paid at the branch counter instead.',
+            ]);
+
+            $payment = $booking->payments()->create([
+                'user_id' => $booking->user_id,
+                'purpose' => $purpose,
+                'gateway' => 'counter',
+                'gateway_reference' => $reference ?: 'CTR-'.Str::upper(Str::random(10)),
+                'amount' => $amount,
+                'currency' => config('payments.currency', 'MYR'),
+                'status' => PaymentStatus::Paid,
+                'paid_at' => now(),
+                'meta' => ['method' => $method, 'recorded_by' => $staff->id, 'recorded_by_name' => $staff->name],
+            ]);
+
+            if ($purpose === Payment::PURPOSE_CHARGES) {
+                BookingCharge::whereKey($outstanding->pluck('id'))->update(['paid_at' => now(), 'payment_id' => $payment->id]);
+            } else {
+                $booking->update(['payment_status' => BookingPaymentStatus::Paid]);
+            }
+
+            DB::afterCommit(fn () => $booking->user?->notify(new PaymentReceived($payment->fresh('booking'))));
+
+            return $payment;
+        });
+    }
+
+    /**
+     * @throws PaymentException
+     */
+    private function openCheckout(Booking $booking, string $gatewayName, string $purpose, float $amount, array $meta = []): Payment
+    {
         if (! $this->gateways->isAvailable($gatewayName)) {
             throw new PaymentException('That payment method is not available right now.');
         }
 
         $gateway = $this->gateways->driver($gatewayName);
 
-        // Only one live checkout per booking: abandon earlier attempts.
-        $booking->payments()->where('status', PaymentStatus::Pending->value)->update([
+        // Only one live checkout per booking and purpose: abandon earlier attempts.
+        $booking->payments()->where('purpose', $purpose)->where('status', PaymentStatus::Pending->value)->update([
             'status' => PaymentStatus::Cancelled->value,
             'failure_reason' => 'Superseded by a new checkout.',
         ]);
 
         $payment = $booking->payments()->create([
             'user_id' => $booking->user_id,
+            'purpose' => $purpose,
             'gateway' => $gatewayName,
-            'amount' => $booking->total_price,
+            'amount' => round($amount, 2),
             'currency' => config('payments.currency', 'MYR'),
             'status' => PaymentStatus::Pending,
+            'meta' => $meta ?: null,
         ]);
 
         try {
@@ -171,7 +260,11 @@ class PaymentService
      */
     public function refundBooking(Booking $booking, string $reason): ?Payment
     {
-        $payment = $booking->payments()->where('status', PaymentStatus::Paid->value)->latest('id')->first();
+        $payment = $booking->payments()
+            ->where('purpose', Payment::PURPOSE_BOOKING)
+            ->where('status', PaymentStatus::Paid->value)
+            ->latest('id')
+            ->first();
 
         return $payment ? $this->refund($payment, $reason) : null;
     }
@@ -261,10 +354,17 @@ class PaymentService
         // attempt (e.g. a slow FPX confirmation after the user cancelled).
         $payment->forceFill(['status' => PaymentStatus::Paid, 'paid_at' => now(), 'failure_reason' => null])->save();
 
+        if ($payment->isForCharges()) {
+            $this->settleCharges($payment);
+
+            return;
+        }
+
         $booking = Booking::withTrashed()->whereKey($payment->booking_id)->lockForUpdate()->firstOrFail();
 
         $alreadyPaidElsewhere = $booking->payments()
             ->whereKeyNot($payment->id)
+            ->where('purpose', Payment::PURPOSE_BOOKING)
             ->where('status', PaymentStatus::Paid->value)
             ->exists();
 
@@ -293,13 +393,44 @@ class PaymentService
         DB::afterCommit(fn () => $booking->user?->notify(new PaymentReceived($payment->fresh('booking'))));
     }
 
+    /**
+     * Mark the charges this payment was opened for as paid. If they were
+     * meanwhile settled at the counter (or waived), the money is returned.
+     */
+    private function settleCharges(Payment $payment): void
+    {
+        $charges = BookingCharge::whereKey($payment->meta['charge_ids'] ?? [])
+            ->where('booking_id', $payment->booking_id)
+            ->outstanding()
+            ->lockForUpdate()
+            ->get();
+
+        if ($charges->isEmpty()) {
+            DB::afterCommit(function () use ($payment) {
+                try {
+                    $this->refund($payment->fresh(), 'Charges already settled');
+                } catch (\Throwable $e) {
+                    Log::error('Automatic refund of duplicate charges payment failed', ['payment' => $payment->uuid, 'error' => $e->getMessage()]);
+                }
+            });
+
+            return;
+        }
+
+        BookingCharge::whereKey($charges->pluck('id'))->update(['paid_at' => now(), 'payment_id' => $payment->id]);
+
+        DB::afterCommit(fn () => $payment->user?->notify(new PaymentReceived($payment->fresh('booking'))));
+    }
+
     private function flagRefundPending(Payment $payment, string $note): void
     {
         $payment->mergeMeta(['refund_note' => $note]);
         $payment->status = PaymentStatus::RefundPending;
         $payment->save();
 
-        $payment->booking?->update(['payment_status' => BookingPaymentStatus::RefundPending]);
+        if (! $payment->isForCharges()) {
+            $payment->booking?->update(['payment_status' => BookingPaymentStatus::RefundPending]);
+        }
 
         Log::warning('Refund requires manual action', ['payment' => $payment->uuid, 'note' => $note]);
     }
@@ -313,7 +444,14 @@ class PaymentService
             'refunded_at' => now(),
         ])->save();
 
-        $payment->booking?->update(['payment_status' => BookingPaymentStatus::Refunded]);
+        if ($payment->isForCharges()) {
+            $payment->charges()->whereNull('voided_at')->update([
+                'voided_at' => now(),
+                'void_reason' => Str::limit('Refunded: '.($payment->meta['refund_reason'] ?? 'refund issued'), 300, ''),
+            ]);
+        } else {
+            $payment->booking?->update(['payment_status' => BookingPaymentStatus::Refunded]);
+        }
         $payment->user?->notify(new PaymentRefunded($payment));
     }
 

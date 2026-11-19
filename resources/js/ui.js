@@ -42,6 +42,71 @@ const register = (Alpine) => {
         },
     }));
 
+    // Finger/stylus signature capture. Writes a PNG data URL to the bound
+    // Livewire property when each stroke ends.
+    Alpine.data('signaturePad', (property) => ({
+        empty: true,
+        drawing: false,
+        init() {
+            const canvas = this.$refs.canvas;
+            const ctx = canvas.getContext('2d');
+            const resize = () => {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                const { width, height } = canvas.getBoundingClientRect();
+                canvas.width = width * ratio;
+                canvas.height = height * ratio;
+                ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+                ctx.lineWidth = 2.4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = '#111827';
+                this.clear(false);
+            };
+            resize();
+            new ResizeObserver(() => { if (this.empty) resize(); }).observe(canvas);
+
+            const point = (e) => {
+                const r = canvas.getBoundingClientRect();
+                return [e.clientX - r.left, e.clientY - r.top];
+            };
+            canvas.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                canvas.setPointerCapture(e.pointerId);
+                this.drawing = true;
+                const [x, y] = point(e);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + 0.1, y + 0.1);
+                ctx.stroke();
+            });
+            canvas.addEventListener('pointermove', (e) => {
+                if (!this.drawing) return;
+                const [x, y] = point(e);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            });
+            const end = () => {
+                if (!this.drawing) return;
+                this.drawing = false;
+                this.empty = false;
+                this.$wire.set(property, canvas.toDataURL('image/png'));
+            };
+            canvas.addEventListener('pointerup', end);
+            canvas.addEventListener('pointerleave', end);
+        },
+        clear(sync = true) {
+            const canvas = this.$refs.canvas;
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            this.empty = true;
+            if (sync) this.$wire.set(property, null);
+        },
+    }));
+
     // Polls a payment's status until it settles, then reloads.
     Alpine.data('paymentPoller', (url) => ({
         tries: 0,

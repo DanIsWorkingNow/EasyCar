@@ -30,7 +30,11 @@
                             </a>
                             <div class="flex flex-1 flex-col p-5">
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <x-status-badge :booking="$booking" />
+                                    @if (in_array($booking->tripMeta()['key'] ?? null, ['on_trip', 'overdue']))
+                                        <x-badge :tone="$booking->tripMeta()['tone']">{{ $booking->tripMeta()['label'] }}</x-badge>
+                                    @else
+                                        <x-status-badge :booking="$booking" />
+                                    @endif
                                     @if (config('payments.enabled') && ! in_array($booking->status, ['rejected', 'cancelled']) || $booking->payment_status->value !== 'unpaid')
                                         <x-payment-badge :status="$booking->payment_status" />
                                     @endif

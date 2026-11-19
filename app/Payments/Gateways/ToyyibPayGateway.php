@@ -48,7 +48,7 @@ class ToyyibPayGateway implements PaymentGateway
         $response = $this->http()->asForm()->post('/index.php/api/createBill', [
             'userSecretKey' => $this->config['secret_key'],
             'categoryCode' => $this->config['category_code'],
-            'billName' => Str::limit("EasyCar {$booking->reference}", 30, ''),
+            'billName' => Str::limit(($payment->isForCharges() ? 'Extras ' : 'EasyCar ').$booking->reference, 30, ''),
             'billDescription' => Str::limit($booking->car_names.' '.$booking->start_date->format('d/m').'-'.$booking->end_date->format('d/m/Y'), 100, ''),
             'billPriceSetting' => 1,
             'billPayorInfo' => 1,
