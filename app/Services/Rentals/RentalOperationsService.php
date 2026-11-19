@@ -123,7 +123,7 @@ class RentalOperationsService
     }
 
     /**
-     * @param  array<int, array{type: string, description: string, amount: float|int|string}>  $extraCharges  staff-added damage/cleaning/other
+     * @param  array<int, array{type?: string, description?: string, amount?: float|int|string}>  $extraCharges  staff-added damage/cleaning/other
      *
      * @throws ValidationException
      */

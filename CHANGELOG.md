@@ -5,7 +5,76 @@ integration session and grouped in [Keep a Changelog](https://keepachangelog.com
 style (`Added` / `Changed` / `Fixed`). Entries are reverse-chronological.
 Commit hashes refer to `main`.
 
-## [Unreleased] — 2026-11-18
+## [Unreleased] — 2026-11-19
+
+### Phase 2 — Rental operations
+Closes the booking lifecycle. Before this, nothing ever marked a booking
+`completed`, car status never changed on pickup or return, and there was
+no record of a car's condition or of charges after a trip.
+
+### Added
+- **Pickup and return handovers** (`App\Services\Rentals\RentalOperationsService`,
+  Livewire `Ops\HandoverForm`): mileage, fuel gauge in eighths, condition
+  checklist, damage on a tap-to-cycle car diagram (scratch → dent →
+  crack), up to 12 photos, licence check, customer name and drawn
+  signature.
+  - Pickup requires payment: an unpaid booking must have a counter payment
+    recorded before the keys are handed over.
+  - The odometer can never go backwards. Readings are checked against the
+    car's last reading and against the pickup.
+  - Car status is automatic: `rented` on pickup; `available` (or
+    `maintenance` if flagged) on return.
+  - The booking becomes `completed` once every car is back, so two-car
+    bookings complete on the second return.
+- **Automatic extra charges** (`ChargeCalculator`, `config/rentals.php`):
+  late return (per started 24 hours after due time plus grace, × a
+  multiplier), fuel (per missing eighth), and optional excess mileage.
+  Staff can add damage/cleaning/other charges and waive any unpaid charge
+  with a reason. Stored in the new `booking_charges` table.
+- **Paying extras:** customers pay online through any configured gateway
+  (new `payments.purpose` column, so extras never affect the rental's
+  `payment_status`). Staff can record cash, card-terminal or bank-transfer
+  payments through the new `counter` gateway. A late online payment for
+  charges already settled at the counter is refunded automatically, and
+  refunding an extras payment waives its charges.
+- **Operations board** (`/ops`, admin and staff): overdue returns, returns
+  due today, ready for pickup, on trip, upcoming pickups (next 3 days),
+  and no-shows. Staff see their branch; admins can filter by branch. The
+  console shows an attention badge and the dashboard a "Today's
+  operations" strip.
+- **Handover reports** (`/inspections/{id}`) are printable and compare
+  pickup with return, flagging new damage. Photos and signatures are kept
+  on the private disk and streamed only after `VehicleInspectionPolicy`
+  allows it (the customer, staff at the car's branch, admins).
+- **Customer booking page:** "Picked up" and "Completed" timeline steps,
+  an on-trip/overdue banner with the due time, the rental policy, links to
+  the handover reports, and an extras panel with online payment.
+- **Overdue alerts:** `rentals:flag-overdue` (hourly) sends `ReturnOverdue`
+  to the customer, branch staff and admins, once per booking. New
+  `PickupCompleted` and `ReturnCompleted` emails, the latter itemising any
+  charges.
+- API: `BookingResource` adds `trip_status`, `pickup_due_at`,
+  `return_due_at`, `picked_up_at`, `completed_at` and
+  `outstanding_charges`.
+- 25 new tests (109 total).
+
+### Changed
+- Migration backfill: confirmed bookings that ended before this release
+  are marked `completed` on their end date. Otherwise every past trip
+  would appear as a no-show. Revenue and utilisation already counted
+  approved and completed alike.
+- Return reminders skip trips that were returned early. Customers can't
+  cancel once a car has been picked up.
+- The demo seeder now creates completed trips with timestamps.
+- Larastan: 0 findings (was 35). Added relation generics and `@mixin`
+  hints on the API resources, and fixed nullsafe and docblock issues.
+
+**Upgrade:** `php artisan migrate`. Optionally set the `RENTAL_*` variables
+(see `.env.example`). Make sure the scheduler runs for overdue alerts.
+
+---
+
+## Production revamp — 2026-11-18 (PR #1)
 
 ### Production revamp — cinematic UI, 3D showroom, payment gateway framework
 A full redesign of every page and a production-hardening pass across the

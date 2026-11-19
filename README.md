@@ -14,6 +14,7 @@ Built with **Laravel 12**, **Livewire 4**, **Tailwind CSS 4** and **three.js**.
 | **3D showroom** | Every car gets an interactive 3D model: orbit/zoom, paint colours, camera presets, headlights, fullscreen. Models are generated per body type (sedan, hatchback, SUV, MPV) by default; admins can upload a real `.glb` per car. three.js is lazy-loaded, rendering pauses off-screen, and there's a photo fallback when WebGL isn't available. |
 | **Booking** | Live availability across branches, a 2-day minimum notice, up to 2 cars per customer for overlapping dates, server-side pricing, and customer edit/cancel. |
 | **Payments** | Driver-based framework (`app/Payments`) with Stripe Checkout, Billplz and ToyyibPay drivers plus a built-in sandbox. Webhooks are signature-verified and idempotent. Rejected or cancelled paid bookings are refunded automatically. Unpaid holds are released on a schedule. |
+| **Rental operations** | A board per branch showing pickups, returns due, cars on trip, overdue returns and no-shows. A tablet-friendly handover form records mileage, fuel, a checklist, damage on a tap-to-mark car diagram, photos and the customer's signature. Late, fuel and mileage charges are calculated automatically. |
 | **Admin console** | Live KPIs and charts, approval queue, bookings (filters, bulk approve, CSV export), payments (refunds, webhook log), fleet (3D preview, `.glb` upload), branches, and users with audited role changes. |
 | **Staff console** | The same tools, scoped to the staff member's branch. |
 | **API** | Versioned REST API (`/api/v1`) with Sanctum tokens and tiered rate limits. A Postman environment lives in `postman/`. |
@@ -65,6 +66,21 @@ How it works:
 
 **Adding a gateway:** implement `App\Payments\Contracts\PaymentGateway`, add a `createXxxDriver()` method to `PaymentManager` (or call `->extend()`), and add an entry to `config/payments.php`.
 
+## Rental operations
+
+The trip lifecycle is **approved → picked up (on trip) → returned → completed**, driven by staff at the branch counter from **Operations** in the console.
+
+- **Pickup:** allowed from the booking's start date. Staff record mileage and fuel, tick the condition checklist, mark any existing damage on the diagram, take photos, check the driving licence and capture the customer's signature. If the booking is still unpaid, staff must record payment taken at the counter (cash, card terminal or bank transfer) before handing over the keys. The car becomes `rented`.
+- **Return:** the form starts from the pickup values and shows new damage against what was recorded at pickup. Automatic charges follow `config/rentals.php`:
+  - **Late return:** each started 24 hours past the due time (end date at `RENTAL_RETURN_TIME`), after `RENTAL_LATE_GRACE_MINUTES`, at the daily rate × `RENTAL_LATE_FEE_MULTIPLIER`.
+  - **Fuel:** each eighth of a tank short × `RENTAL_FUEL_CHARGE_PER_EIGHTH`.
+  - **Mileage:** kilometres over `RENTAL_DAILY_KM_ALLOWANCE` per day × `RENTAL_EXCESS_KM_RATE`. This applies only if an allowance is set.
+
+  Staff can add damage or cleaning charges and send the car to maintenance. Once every car on the booking is back, the booking is `completed`.
+- **Extra charges:** customers pay them online from their booking page through the configured gateways (`payments.purpose = charges`, kept separate from the rental payment). Staff can also record them as paid at the counter, or waive a charge with a reason. Refunding an extras payment waives the charges it covered.
+- **Reports:** every handover produces a printable report. Photos and signatures are stored on the **private** `local` disk and served only to the customer, staff at the car's branch, and admins.
+- **Alerts:** `rentals:flag-overdue` (hourly) emails the customer, the branch team and admins once when a car is overdue.
+
 ## 3D models
 
 - The default model is generated from extruded side profiles in `resources/js/car-viewer/procedural-car.js`, with paint taken from the car's **Paint colour** field.
@@ -74,13 +90,13 @@ How it works:
 ## Operations
 
 ```bash
-php artisan test                 # 84 Pest tests
+php artisan test                 # 109 Pest tests
 ./vendor/bin/pint --test         # code style
 ./vendor/bin/phpstan analyse     # Larastan
 npm run build                    # production assets
 ```
 
-The scheduler (`php artisan schedule:run` via cron) handles reminders, the weekly report and payment-hold expiry. Queue workers deliver email notifications. `deploy/forge-deploy-script.sh` is a zero-downtime Laravel Forge deploy script.
+The scheduler (`php artisan schedule:run` via cron) handles reminders, the weekly report, payment-hold expiry and overdue-return alerts. Queue workers deliver email notifications. `deploy/forge-deploy-script.sh` is a zero-downtime Laravel Forge deploy script.
 
 **Production checklist:** set `APP_ENV=production` and `APP_DEBUG=false`; set `PAYMENTS_SANDBOX_ENABLED=false`; configure at least one real gateway and register its webhook URL; set `TRUSTED_PROXIES` if you're behind a load balancer; and configure mail.
 
@@ -89,7 +105,8 @@ The scheduler (`php artisan schedule:run` via cron) handles reminders, the weekl
 ```
 app/Payments/            gateway contract, manager, drivers, DTOs
 app/Services/            booking creation/availability, payments, dashboard
-app/Livewire/            booking picker, live dashboards
+app/Services/Rentals/    handover (pickup/return), charge calculator
+app/Livewire/            booking picker, live dashboards, handover form
 resources/js/car-viewer/ three.js viewer + procedural car builder
 resources/views/         layouts, components (x-car-tile, x-car-viewer…), pages
 tests/Feature/           Pest feature tests (payments, lifecycle, pages, API)

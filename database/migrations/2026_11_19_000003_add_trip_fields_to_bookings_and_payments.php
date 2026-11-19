@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -9,6 +10,12 @@ use Illuminate\Support\Facades\Schema;
  *   and whether the overdue alert has gone out.
  * - payments.purpose: "booking" (the rental itself) or "charges" (extras
  *   billed after return). Existing rows are rental payments.
+ *
+ * Backfill: confirmed bookings that ended before handovers were recorded
+ * are marked completed (on their end date). Otherwise every historical
+ * trip would sit on the operations board as a "no-show" and never count
+ * as completed. Revenue and utilisation already treat approved and
+ * completed alike, so dashboards are unaffected.
  */
 return new class extends Migration
 {
@@ -24,6 +31,16 @@ return new class extends Migration
         Schema::table('payments', function (Blueprint $table) {
             $table->string('purpose', 20)->default('booking')->after('user_id');
         });
+
+        DB::table('bookings')
+            ->where('status', 'approved')
+            ->whereDate('end_date', '<', now()->toDateString())
+            ->whereNull('deleted_at')
+            ->update([
+                'status' => 'completed',
+                'completed_at' => DB::raw('end_date'),
+                'returned_at' => DB::raw('end_date'),
+            ]);
     }
 
     public function down(): void

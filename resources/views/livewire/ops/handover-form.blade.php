@@ -84,7 +84,7 @@
                         <div class="space-y-5">
                             <fieldset>
                                 <legend class="label">Checklist</legend>
-                                <div class="grid gap-2 sm:grid-cols-2">
+                                <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
                                     @foreach (config('rentals.checklist') as $key => $label)
                                         <label class="flex cursor-pointer items-center gap-3 rounded-lg bg-white/[0.03] px-3 py-2.5 text-sm ring-1 ring-line hover:ring-white/20">
                                             <input type="checkbox" wire:model="checklist.{{ $key }}" class="checkbox"> {{ $label }}

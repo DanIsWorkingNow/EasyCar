@@ -2,9 +2,13 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * @mixin Booking
+ */
 class BookingResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -13,7 +17,7 @@ class BookingResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->reference,
             'status' => $this->status,
-            'payment_status' => $this->payment_status?->value,
+            'payment_status' => $this->payment_status->value,
             'start_date' => $this->start_date->toDateString(),
             'end_date' => $this->end_date->toDateString(),
             'total_days' => $this->total_days,

@@ -40,7 +40,7 @@ class InspectionController extends Controller
     public function signature(VehicleInspection $inspection)
     {
         $this->authorize('view', $inspection);
-        abort_unless($inspection->signature_path, 404);
+        abort_unless(filled($inspection->signature_path), 404);
 
         return $this->stream($inspection->signature_path);
     }

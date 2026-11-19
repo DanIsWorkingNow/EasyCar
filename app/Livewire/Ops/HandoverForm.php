@@ -22,6 +22,13 @@ use Livewire\WithFileUploads;
  * readings, checklist, damage diagram, photos, payment (if still owed) or
  * extras (on return), and the customer's signature. Everything is
  * re-validated and authorised server-side by RentalOperationsService.
+ *
+ * @property-read Booking $booking
+ * @property-read Car $car
+ * @property-read VehicleInspection|null $pickup
+ * @property-read string|null $blocker
+ * @property-read bool $paymentRequired
+ * @property-read array<int, array{type: ChargeType, description: string, quantity: float, unit_amount: float, amount: float}> $quote
  */
 class HandoverForm extends Component
 {

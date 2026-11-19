@@ -206,7 +206,9 @@ class Booking extends Model
      */
     public function statusMeta(): array
     {
-        return self::STATUS_META[$this->status] ?? ['label' => ucfirst((string) $this->status), 'tone' => 'neutral'];
+        $status = (string) $this->getAttribute('status');
+
+        return self::STATUS_META[$status] ?? ['label' => ucfirst($status), 'tone' => 'neutral'];
     }
 
     /**

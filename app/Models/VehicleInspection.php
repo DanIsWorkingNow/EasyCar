@@ -104,7 +104,7 @@ class VehicleInspection extends Model
      */
     public function newDamagesComparedTo(?self $pickup): array
     {
-        $before = $pickup?->damages ?? [];
+        $before = $pickup->damages ?? [];
 
         return collect($this->damages ?? [])
             ->filter(fn ($kind, $zone) => ($before[$zone] ?? null) !== $kind)

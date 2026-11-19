@@ -111,7 +111,7 @@ class BookingController extends Controller
                 $b->total_days,
                 number_format((float) $b->total_price, 2, '.', ''),
                 $b->status,
-                $b->payment_status?->value,
+                $b->payment_status->value,
                 $b->created_at?->toDateTimeString(),
             ]);
 
@@ -121,6 +121,7 @@ class BookingController extends Controller
         ], $rows);
     }
 
+    /** @return Builder<Booking> */
     private function filtered(Request $request): Builder
     {
         return Booking::query()

@@ -187,7 +187,8 @@ class PaymentService
     }
 
     /**
-     * @throws InvalidSignatureException
+     * @throws InvalidSignatureException when the notification can't be authenticated
+     * @throws PaymentException when it can't be processed
      */
     public function handleWebhook(string $gatewayName, Request $request): ?Payment
     {
