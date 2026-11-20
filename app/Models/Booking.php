@@ -71,6 +71,9 @@ class Booking extends Model
         'returned_at',
         'completed_at',
         'overdue_notified_at',
+        'terms_version',
+        'terms_accepted_at',
+        'terms_accepted_ip',
     ];
 
     protected $attributes = [
@@ -86,6 +89,7 @@ class Booking extends Model
         'returned_at' => 'datetime',
         'completed_at' => 'datetime',
         'overdue_notified_at' => 'datetime',
+        'terms_accepted_at' => 'datetime',
         'total_price' => 'float',
         'payment_status' => BookingPaymentStatus::class,
     ];
@@ -297,7 +301,39 @@ class Booking extends Model
 
     public function canBeApproved(): bool
     {
-        return $this->isPending() && $this->days_until_start >= 2;
+        return $this->approvalBlocker() === null;
+    }
+
+    /** Why this booking can't be approved yet, or null if it can. */
+    public function approvalBlocker(): ?string
+    {
+        return match (true) {
+            ! $this->isPending() => 'Only pending bookings can be approved.',
+            $this->days_until_start < 2 => 'Bookings need at least 2 days\' notice to be approved.',
+            default => $this->driverBlocker(),
+        };
+    }
+
+    /**
+     * Driver-eligibility check (Phase 3): verified licence and ID, licence
+     * valid until the return date, and minimum age at pick-up.
+     */
+    public function driverBlocker(): ?string
+    {
+        if (! config('compliance.require_verified_driver')) {
+            return null;
+        }
+
+        $profile = $this->user?->driverProfile;
+        $minAge = (int) config('compliance.min_driver_age', 21);
+
+        return match (true) {
+            $profile === null => 'The customer hasn\'t submitted their driving licence yet.',
+            ! $profile->isVerified() => 'The customer\'s driving licence is awaiting verification.',
+            $profile->licence_expiry->lt($this->end_date) => 'The customer\'s licence expires ('.$profile->licence_expiry->format('d M Y').') before the return date.',
+            $profile->ageOn($this->start_date) < $minAge => "The driver must be at least {$minAge} at pick-up.",
+            default => null,
+        };
     }
 
     public function canBeRejected(): bool

@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -62,6 +63,17 @@ class User extends Authenticatable
     }
 
     /** @return BelongsTo<Branch, $this> */
+    /** @return HasOne<DriverProfile, $this> */
+    public function driverProfile(): HasOne
+    {
+        return $this->hasOne(DriverProfile::class);
+    }
+
+    public function isVerifiedDriver(): bool
+    {
+        return (bool) $this->driverProfile?->isVerified();
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);

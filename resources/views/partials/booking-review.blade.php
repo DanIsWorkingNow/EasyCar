@@ -10,9 +10,12 @@
     </x-slot:actions>
 </x-page-header>
 
-@if ($booking->isPending() && ! $booking->canBeApproved())
-    <div class="mb-6 flex items-center gap-3 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-200 ring-1 ring-amber-500/25">
-        <x-icon name="warning" class="size-5" /> Starts in {{ $booking->days_until_start }} day(s) — bookings need at least 2 days' notice to be approved.
+@if ($booking->isPending() && ($blocker = $booking->approvalBlocker()))
+    <div class="mb-6 flex flex-wrap items-center gap-3 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-200 ring-1 ring-amber-500/25">
+        <x-icon name="warning" class="size-5" /> {{ $blocker }}
+        @if ($booking->driverBlocker() && $booking->user->driverProfile)
+            <a href="{{ route('ops.verifications.show', $booking->user->driverProfile) }}" class="ml-auto font-semibold text-white underline">Review documents</a>
+        @endif
     </div>
 @endif
 
@@ -68,7 +71,9 @@
                                     <td>{{ $payment->gatewayLabel() }}@if (($payment->meta['method'] ?? null) && $payment->gateway === 'counter')<span class="block text-xs text-subtle">{{ \App\Payments\Gateways\CounterGateway::METHODS[$payment->meta['method']] ?? '' }}</span>@endif</td>
                                     <td class="font-mono text-xs">@if ($paymentRoute ?? null)<a href="{{ route($paymentRoute, $payment) }}" class="hover:underline">{{ Str::limit($payment->gateway_reference, 22) }}</a>@else{{ Str::limit($payment->gateway_reference, 22) }}@endif</td>
                                     <td><x-payment-badge :status="$payment->status" /></td>
-                                    <td class="text-right font-medium">RM {{ number_format($payment->amount, 2) }}</td>
+                                    <td class="text-right font-medium">RM {{ number_format($payment->amount, 2) }}
+                                        @foreach ($payment->invoices as $doc)<a href="{{ route('invoices.show', $doc) }}" class="block text-xs font-normal text-mute hover:text-white">{{ $doc->number }}</a>@endforeach
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -86,6 +91,15 @@
                 <div class="min-w-0"><p class="truncate font-medium">{{ $booking->user->name }}</p><p class="truncate text-sm text-subtle">{{ $booking->user->email }}</p></div>
             </div>
             <p class="mt-4 text-xs text-subtle">Customer since {{ $booking->user->created_at?->format('M Y') }} · {{ $booking->user->bookings()->count() }} booking(s)</p>
+            @php($driver = $booking->user->driverProfile)
+            <div class="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4 text-sm">
+                <span class="text-subtle">Driver</span>
+                @if ($driver)
+                    <a href="{{ route('ops.verifications.show', $driver) }}"><x-badge :tone="$driver->status->tone()" icon="shield">{{ $driver->status->label() }}</x-badge></a>
+                @else
+                    <x-badge tone="neutral">Not submitted</x-badge>
+                @endif
+            </div>
         </section>
         <section class="card card-pad">
             <p class="text-sm text-mute">Total</p>

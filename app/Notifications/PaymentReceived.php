@@ -2,7 +2,9 @@
 
 namespace App\Notifications;
 
+use App\Models\Invoice;
 use App\Models\Payment;
+use App\Services\InvoiceService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -32,7 +34,15 @@ class PaymentReceived extends Notification implements ShouldQueue
             ->line('Method: '.$this->payment->gatewayLabel())
             ->line('Transaction: '.$this->payment->gateway_reference)
             ->line('Paid at: '.$this->payment->paid_at?->format('M d, Y g:i A'))
-            ->action('View booking', route('bookings.show', $booking));
+            ->action('View booking', route('bookings.show', $booking))
+            ->when($this->document(), fn (MailMessage $m, Invoice $doc) => $m
+                ->line('Your '.strtolower($doc->title()).' '.$doc->number.' is attached.')
+                ->attachData(app(InvoiceService::class)->pdf($doc)->output(), $doc->filename(), ['mime' => 'application/pdf']));
+    }
+
+    private function document(): ?Invoice
+    {
+        return $this->payment->invoices()->where('kind', Invoice::INVOICE)->first();
     }
 
     public function toArray($notifiable): array

@@ -4,11 +4,13 @@ namespace App\Providers;
 
 use App\Models\Booking;
 use App\Models\Car;
+use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\VehicleInspection;
 use App\Policies\BookingPolicy;
 use App\Policies\CarPolicy;
+use App\Policies\InvoicePolicy;
 use App\Policies\PaymentPolicy;
 use App\Policies\VehicleInspectionPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
@@ -31,6 +33,7 @@ class AuthServiceProvider extends ServiceProvider
         Booking::class => BookingPolicy::class,
         Payment::class => PaymentPolicy::class,
         VehicleInspection::class => VehicleInspectionPolicy::class,
+        Invoice::class => InvoicePolicy::class,
     ];
 
     public function boot(): void
@@ -42,6 +45,10 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('handover', fn (User $user, Car $car) => $user->hasRole('staff')
             && $user->branch_id !== null
             && $car->branch_id === $user->branch_id);
+
+        // Any staff member may review driver documents (customers aren't
+        // tied to a branch); admins pass via Gate::before().
+        Gate::define('verify-drivers', fn (User $user) => $user->hasRole('staff'));
 
         Gate::define('manage-charges', fn (User $user, Booking $booking) => $user->hasRole('staff')
             && $user->branch_id !== null

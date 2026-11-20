@@ -4,8 +4,9 @@
     $nav = $isAdmin
         ? [
             ['Overview', 'admin.dashboard', 'grid', 'admin.dashboard'],
-            ['Operations', 'ops.board', 'car', 'ops.*'],
+            ['Operations', 'ops.board', 'car', 'ops.board'],
             ['Bookings', 'admin.bookings.index', 'calendar', 'admin.bookings.*'],
+            ['Verifications', 'ops.verifications.index', 'shield', 'ops.verifications.*'],
             ['Payments', 'admin.payments.index', 'card', 'admin.payments.*'],
             ['Fleet', 'admin.cars.index', 'cube', 'admin.cars.*'],
             ['Branches', 'admin.branches.index', 'building', 'admin.branches.*'],
@@ -13,14 +14,16 @@
         ]
         : [
             ['Overview', 'staff.dashboard', 'grid', 'staff.dashboard'],
-            ['Operations', 'ops.board', 'car', 'ops.*'],
+            ['Operations', 'ops.board', 'car', 'ops.board'],
             ['Bookings', 'staff.bookings.index', 'calendar', 'staff.bookings.*'],
+            ['Verifications', 'ops.verifications.index', 'shield', 'ops.verifications.*'],
             ['Branch fleet', 'staff.cars.index', 'cube', 'staff.cars.*'],
         ];
     $pending = \App\Models\Booking::pending()
         ->when(! $isAdmin, fn ($q) => $q->whereHas('cars', fn ($c) => $c->where('branch_id', $user->branch_id)))
         ->count();
     $opsSummary = ($isAdmin || $user->branch_id) ? app(\App\Services\Rentals\RentalOperationsService::class)->summary($isAdmin ? null : $user->branch_id) : [];
+    $pendingVerifications = \App\Models\DriverProfile::where('status', 'pending')->count();
     $opsDue = ($opsSummary['overdue'] ?? 0) + ($opsSummary['pickups_today'] ?? 0) + ($opsSummary['returns_today'] ?? 0);
 @endphp
 <!doctype html>
@@ -53,6 +56,8 @@
                     <span class="flex-1">{{ $label }}</span>
                     @if ($label === 'Bookings' && $pending)
                         <span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-300">{{ $pending }}</span>
+                    @elseif ($label === 'Verifications' && $pendingVerifications)
+                        <span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-bold text-sky-300">{{ $pendingVerifications }}</span>
                     @elseif ($label === 'Operations' && $opsDue)
                         <span class="rounded-full px-2 py-0.5 text-[11px] font-bold {{ ($opsSummary['overdue'] ?? 0) ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/15 text-emerald-300' }}">{{ $opsDue }}</span>
                     @endif

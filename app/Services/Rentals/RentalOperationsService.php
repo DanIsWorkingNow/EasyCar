@@ -50,7 +50,7 @@ class RentalOperationsService
             $booking->inspectionFor($car->id, VehicleInspection::PICKUP) !== null => 'This car has already been handed over.',
             today()->lt($booking->start_date) => 'Pick-up opens on '.$booking->start_date->format('D, d M').'.',
             today()->gt($booking->end_date) => 'The rental period has ended without a pick-up.',
-            default => null,
+            default => $booking->driverBlocker(),
         };
     }
 
@@ -352,7 +352,7 @@ class RentalOperationsService
 
     private function lock(Booking $booking): Booking
     {
-        return Booking::whereKey($booking->id)->lockForUpdate()->firstOrFail()->load(['cars', 'inspections', 'user']);
+        return Booking::whereKey($booking->id)->lockForUpdate()->firstOrFail()->load(['cars', 'inspections', 'user.driverProfile']);
     }
 
     private function forgetDashboardCache(Booking $booking): void

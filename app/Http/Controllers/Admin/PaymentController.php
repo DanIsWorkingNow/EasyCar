@@ -48,7 +48,7 @@ class PaymentController extends Controller
 
     public function show(Payment $payment, PaymentManager $gateways)
     {
-        $payment->load(['booking.cars', 'user', 'events' => fn ($q) => $q->latest()]);
+        $payment->load(['booking.cars', 'user', 'invoices', 'events' => fn ($q) => $q->latest()]);
 
         return view('admin.payments.show', [
             'payment' => $payment,

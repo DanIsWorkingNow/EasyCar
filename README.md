@@ -15,6 +15,7 @@ Built with **Laravel 12**, **Livewire 4**, **Tailwind CSS 4** and **three.js**.
 | **Booking** | Live availability across branches, a 2-day minimum notice, up to 2 cars per customer for overlapping dates, server-side pricing, and customer edit/cancel. |
 | **Payments** | Driver-based framework (`app/Payments`) with Stripe Checkout, Billplz and ToyyibPay drivers plus a built-in sandbox. Webhooks are signature-verified and idempotent. Rejected or cancelled paid bookings are refunded automatically. Unpaid holds are released on a schedule. |
 | **Rental operations** | A board per branch showing pickups, returns due, cars on trip, overdue returns and no-shows. A tablet-friendly handover form records mileage, fuel, a checklist, damage on a tap-to-mark car diagram, photos and the customer's signature. Late, fuel and mileage charges are calculated automatically. |
+| **Trust & compliance** | Driver verification (licence + IC/passport, encrypted at rest, private documents) with a staff review queue and enforcement at approval and pick-up; versioned rental-terms acceptance; Terms & PDPA Privacy pages; numbered tax invoices and credit notes as PDF, attached to receipt emails; branded email templates. |
 | **Admin console** | Live KPIs and charts, approval queue, bookings (filters, bulk approve, CSV export), payments (refunds, webhook log), fleet (3D preview, `.glb` upload), branches, and users with audited role changes. |
 | **Staff console** | The same tools, scoped to the staff member's branch. |
 | **API** | Versioned REST API (`/api/v1`) with Sanctum tokens and tiered rate limits. A Postman environment lives in `postman/`. |
@@ -81,6 +82,12 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 - **Reports:** every handover produces a printable report. Photos and signatures are stored on the **private** `local` disk and served only to the customer, staff at the car's branch, and admins.
 - **Alerts:** `rentals:flag-overdue` (hourly) emails the customer, the branch team and admins once when a car is overdue.
 
+## Trust & compliance
+
+- **Driver verification:** customers upload their licence (front/back) and IC or passport from **Account → Driver verification**. Licence and ID numbers are stored with Laravel's `encrypted` cast; images go on the private `local` disk and are streamed only to the owner and staff. Staff review submissions in **Operations → Verifications**. With `COMPLIANCE_REQUIRE_VERIFIED_DRIVER=true` (the default), a booking can't be approved or handed over until the driver is verified, the licence is valid through the return date, and they meet `COMPLIANCE_MIN_DRIVER_AGE`. Staff see the exact reason on the booking.
+- **Rental agreement:** the booking flow requires accepting the Terms of Rental. The accepted `COMPLIANCE_TERMS_VERSION`, time and IP are stored on the booking. `/terms` and `/privacy` (PDPA) are templates; have them reviewed before launch.
+- **Invoices:** every settled payment (online, counter, rental or extras) gets an immutable tax invoice numbered `INV-YYYY-NNNNNN`; every refund gets a credit note `CN-YYYY-NNNNNN` referencing it. Seller, buyer and lines are snapshotted at issue time. Prices are tax-inclusive; set `INVOICE_TAX_RATE` to show the tax portion. PDFs (dompdf, ~25 KB) are attached to receipt and refund emails and downloadable from the booking and admin pages.
+
 ## 3D models
 
 - The default model is generated from extruded side profiles in `resources/js/car-viewer/procedural-car.js`, with paint taken from the car's **Paint colour** field.
@@ -90,7 +97,7 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 ## Operations
 
 ```bash
-php artisan test                 # 109 Pest tests
+php artisan test                 # 126 Pest tests
 ./vendor/bin/pint --test         # code style
 ./vendor/bin/phpstan analyse     # Larastan
 npm run build                    # production assets
@@ -112,4 +119,4 @@ resources/views/         layouts, components (x-car-tile, x-car-viewer…), page
 tests/Feature/           Pest feature tests (payments, lifecycle, pages, API)
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for the history of changes.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the 10-phase plan and [CHANGELOG.md](CHANGELOG.md) for the history of changes.

@@ -33,7 +33,7 @@ class BookingController extends Controller
 
     public function show(Booking $booking)
     {
-        $booking->load(['user', 'cars.branch', 'approvedBy', 'payments' => fn ($q) => $q->latest(), 'inspections', 'charges']);
+        $booking->load(['user', 'cars.branch', 'approvedBy', 'payments' => fn ($q) => $q->latest()->with('invoices'), 'inspections', 'charges', 'user.driverProfile']);
 
         return view('admin.bookings.show', compact('booking'));
     }
