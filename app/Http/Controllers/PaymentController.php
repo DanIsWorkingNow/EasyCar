@@ -34,6 +34,26 @@ class PaymentController extends Controller
     }
 
     /**
+     * Pay outstanding extras (late return, fuel, damage…) online.
+     */
+    public function payCharges(Request $request, Booking $booking, PaymentService $payments, PaymentManager $gateways)
+    {
+        abort_unless($booking->user_id === $request->user()->id, 403);
+
+        $validated = $request->validate([
+            'gateway' => ['required', 'string', Rule::in(array_keys($gateways->available()))],
+        ], ['gateway.in' => 'Please choose an available payment method.']);
+
+        try {
+            $payment = $payments->startChargesCheckout($booking, $validated['gateway']);
+        } catch (PaymentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->away($payment->checkout_url);
+    }
+
+    /**
      * Where gateways send the customer back to after checkout.
      */
     public function return(Request $request, Payment $payment, PaymentService $payments)

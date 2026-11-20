@@ -22,7 +22,7 @@ class UserRoleSyncService
 
     public function syncAndLog(User $user, int $newUserLevel, ?int $changedByUserId): void
     {
-        $oldRole = $user->roles->first()?->name;
+        $oldRole = $user->roles->first()?->getAttribute('name');
         $newRole = $this->roleNameForLevel($newUserLevel);
 
         if ($oldRole === $newRole) {

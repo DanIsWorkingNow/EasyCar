@@ -31,7 +31,8 @@ class SendRentalReminders extends Command
             $booking->user->notify(new RentalReminder($booking, 'pickup'));
         }
 
-        $returns = Booking::approved()->whereDate('end_date', $tomorrow)->with('user')->get();
+        // Skip trips that have already been returned early.
+        $returns = Booking::approved()->whereDate('end_date', $tomorrow)->whereNull('completed_at')->with('user')->get();
         foreach ($returns as $booking) {
             $booking->user->notify(new RentalReminder($booking, 'return'));
         }

@@ -16,3 +16,4 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('bookings:send-reminders')->dailyAt('09:00');                    // FR-NOT-03
 Schedule::command('reports:weekly-summary')->weeklyOn(1, '08:00');                 // FR-RPT-03, Mondays
 Schedule::command('bookings:expire-unpaid')->everyFiveMinutes()->withoutOverlapping(); // payment holds
+Schedule::command('rentals:flag-overdue')->hourly()->withoutOverlapping();            // overdue returns

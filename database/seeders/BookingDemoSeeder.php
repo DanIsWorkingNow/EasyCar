@@ -66,6 +66,11 @@ class BookingDemoSeeder extends Seeder
             $createdAt = Carbon::now()->subDays(rand(0, 44))->subHours(rand(0, 23));
             [$startDate, $endDate, $days] = $this->pickRentalWindow($status);
 
+            // An approved rental whose dates are already over has happened.
+            if ($status === 'approved' && $endDate < Carbon::today()->toDateString()) {
+                $status = 'completed';
+            }
+
             $totalPrice = $pickedCars->sum(fn ($car) => $car->price_per_day * $days);
 
             $attributes = [
@@ -87,6 +92,11 @@ class BookingDemoSeeder extends Seeder
             // Payments (sandbox gateway): everything that went ahead was
             // paid; rejected bookings were paid and then refunded.
             $attributes['payment_status'] = $status === 'rejected' ? 'refunded' : 'paid';
+
+            if ($status === 'completed') {
+                $attributes['picked_up_at'] = Carbon::parse($startDate)->setTime(10, rand(0, 59));
+                $attributes['returned_at'] = $attributes['completed_at'] = Carbon::parse($endDate)->setTime(rand(15, 18), rand(0, 59));
+            }
 
             $booking = Booking::create($attributes);
             $booking->forceFill(['created_at' => $createdAt, 'updated_at' => $createdAt])->save();

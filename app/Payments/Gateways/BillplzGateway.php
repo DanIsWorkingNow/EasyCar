@@ -49,7 +49,7 @@ class BillplzGateway implements PaymentGateway
             'amount' => $payment->amountInMinorUnits(),
             'callback_url' => $urls['callback'],
             'redirect_url' => $urls['return'],
-            'description' => Str::limit("EasyCar booking {$booking->reference}: {$booking->car_names}", 200, ''),
+            'description' => Str::limit(($payment->isForCharges() ? 'EasyCar extra charges ' : 'EasyCar booking ')."{$booking->reference}: {$booking->car_names}", 200, ''),
             'reference_1_label' => 'Booking',
             'reference_1' => $booking->reference,
             'reference_2_label' => 'Payment',

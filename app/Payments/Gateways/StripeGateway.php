@@ -42,6 +42,7 @@ class StripeGateway implements PaymentGateway
         $booking = $payment->booking;
 
         $separator = str_contains($urls['return'], '?') ? '&' : '?';
+        $title = ($payment->isForCharges() ? 'EasyCar extra charges ' : 'EasyCar booking ').$booking->reference;
 
         $response = $this->http()
             ->withHeaders(['Idempotency-Key' => 'checkout-'.$payment->uuid])
@@ -59,7 +60,7 @@ class StripeGateway implements PaymentGateway
                     'booking_reference' => $booking->reference,
                 ],
                 'payment_intent_data' => [
-                    'description' => "EasyCar booking {$booking->reference}",
+                    'description' => $title,
                     'metadata' => [
                         'payment_uuid' => $payment->uuid,
                         'booking_reference' => $booking->reference,
@@ -71,7 +72,7 @@ class StripeGateway implements PaymentGateway
                         'currency' => strtolower($payment->currency),
                         'unit_amount' => $payment->amountInMinorUnits(),
                         'product_data' => [
-                            'name' => "EasyCar booking {$booking->reference}",
+                            'name' => $title,
                             'description' => Str::limit(
                                 $booking->car_names.' · '.$booking->start_date->format('d M').' – '.$booking->end_date->format('d M Y'),
                                 250

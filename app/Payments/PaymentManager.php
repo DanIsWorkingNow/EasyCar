@@ -4,6 +4,7 @@ namespace App\Payments;
 
 use App\Payments\Contracts\PaymentGateway;
 use App\Payments\Gateways\BillplzGateway;
+use App\Payments\Gateways\CounterGateway;
 use App\Payments\Gateways\SandboxGateway;
 use App\Payments\Gateways\StripeGateway;
 use App\Payments\Gateways\ToyyibPayGateway;
@@ -36,6 +37,11 @@ class PaymentManager extends Manager
     public function createToyyibpayDriver(): PaymentGateway
     {
         return new ToyyibPayGateway($this->gatewayConfig('toyyibpay'));
+    }
+
+    public function createCounterDriver(): PaymentGateway
+    {
+        return new CounterGateway;
     }
 
     public function createSandboxDriver(): PaymentGateway

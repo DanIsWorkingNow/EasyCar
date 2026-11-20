@@ -2,12 +2,15 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Car;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * SUPERSEDES the CarResource shipped in the API kit — adds plate_number
  * (FR-CAR-06).
+ *
+ * @mixin Car
  */
 class CarResource extends JsonResource
 {

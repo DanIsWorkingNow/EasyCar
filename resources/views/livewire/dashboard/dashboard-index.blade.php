@@ -24,6 +24,16 @@
         </div>
     </div>
 
+    @php($ops = app(\App\Services\Rentals\RentalOperationsService::class)->summary($branchId))
+    <a href="{{ route('ops.board', $branchId ? ['branch_id' => $branchId] : []) }}" class="card mb-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4 transition hover:border-white/20">
+        <span class="flex items-center gap-2 font-semibold"><x-icon name="car" class="text-brand" /> Today's operations</span>
+        <span class="text-sm text-mute"><span class="font-semibold text-match">{{ $ops['pickups_today'] }}</span> pick-ups</span>
+        <span class="text-sm text-mute"><span class="font-semibold text-amber-300">{{ $ops['returns_today'] }}</span> returns due</span>
+        <span class="text-sm text-mute"><span class="font-semibold text-sky-300">{{ $ops['on_trip'] + $ops['returns_today'] + $ops['overdue'] }}</span> on trip</span>
+        <span class="text-sm text-mute"><span class="font-semibold {{ $ops['overdue'] ? 'text-red-400' : 'text-white' }}">{{ $ops['overdue'] }}</span> overdue</span>
+        <span class="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-white/80">Open board <x-icon name="arrow-right" class="size-4" /></span>
+    </a>
+
     <livewire:dashboard.kpi-cards :branch-id="$branchId" :period="$period" :key="'kpi-'.$branchId.'-'.$period" />
 
     <div class="mt-6 grid gap-6 {{ $isAdmin ? 'xl:grid-cols-[1.5fr_1fr]' : '' }}">

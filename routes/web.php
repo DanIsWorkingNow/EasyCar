@@ -9,8 +9,12 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CarController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InspectionController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Ops\BoardController as OpsBoardController;
+use App\Http\Controllers\Ops\ChargeController as OpsChargeController;
+use App\Http\Controllers\Ops\HandoverController as OpsHandoverController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\ProfileController;
@@ -56,6 +60,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/bookings/{booking}/pay', [PaymentController::class, 'store'])
         ->middleware('throttle:10,1')
         ->name('bookings.pay');
+    Route::post('/bookings/{booking}/charges/pay', [PaymentController::class, 'payCharges'])
+        ->middleware('throttle:10,1')
+        ->name('bookings.charges.pay');
     Route::get('/payments/{payment}/return', [PaymentController::class, 'return'])->name('payments.return');
     Route::get('/payments/{payment}/status', [PaymentController::class, 'status'])->name('payments.status');
     Route::get('/payments/{payment}/sandbox', [PaymentController::class, 'sandbox'])->name('payments.sandbox.show');
@@ -65,9 +72,24 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
 
+    // Handover reports (customer, branch staff, admins — see VehicleInspectionPolicy).
+    Route::get('/inspections/{inspection}', [InspectionController::class, 'show'])->name('inspections.show');
+    Route::get('/inspections/{inspection}/photos/{photo}', [InspectionController::class, 'photo'])->name('inspections.photo');
+    Route::get('/inspections/{inspection}/signature', [InspectionController::class, 'signature'])->name('inspections.signature');
+
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/notifications/{id}', [NotificationController::class, 'open'])->name('notifications.open');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+});
+
+// ── Rental operations (admins: every branch; staff: their own) ────────
+Route::middleware(['auth', 'role:admin|staff'])->prefix('ops')->name('ops.')->group(function () {
+    Route::get('/', [OpsBoardController::class, 'index'])->name('board');
+    Route::get('/bookings/{booking}/cars/{car}/pickup', [OpsHandoverController::class, 'pickup'])->name('pickup');
+    Route::get('/bookings/{booking}/cars/{car}/return', [OpsHandoverController::class, 'return'])->name('return');
+    Route::post('/bookings/{booking}/charges', [OpsChargeController::class, 'store'])->name('charges.store');
+    Route::post('/bookings/{booking}/charges/collect', [OpsChargeController::class, 'collect'])->name('charges.collect');
+    Route::post('/charges/{charge}/void', [OpsChargeController::class, 'void'])->name('charges.void');
 });
 
 // ── Admin console ─────────────────────────────────────────────────────

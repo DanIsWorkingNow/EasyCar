@@ -8,8 +8,10 @@
             ['Reserved', true],
             ['Paid', $booking->isPaid() || in_array($booking->payment_status->value, ['refunded', 'refund_pending'])],
             ['Confirmed', in_array($booking->status, ['approved', 'completed'])],
+            ['Picked up', $booking->picked_up_at !== null],
             ['Completed', $booking->status === 'completed'],
         ];
+        $outstanding = $booking->outstandingCharges();
         if (! config('payments.enabled')) { unset($steps[1]); }
         $terminal = in_array($booking->status, ['rejected', 'cancelled']);
     @endphp
@@ -40,7 +42,7 @@
                     </div>
                 </div>
             @else
-                <ol class="grid gap-4 {{ count($steps) === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3' }}">
+                <ol class="grid gap-4 {{ count($steps) === 5 ? 'sm:grid-cols-5' : 'sm:grid-cols-4' }}">
                     @foreach (array_values($steps) as $i => [$label, $done])
                         <li class="flex items-center gap-3">
                             <span class="grid size-9 shrink-0 place-items-center rounded-full text-sm font-bold {{ $done ? 'bg-brand text-white' : 'bg-white/5 text-subtle ring-1 ring-white/10' }}">
@@ -51,7 +53,20 @@
                         </li>
                     @endforeach
                 </ol>
-                @if ($booking->isApproved() && $booking->approval_notes)
+                @if ($booking->isOnTrip())
+                    <div class="mt-5 flex flex-wrap items-center gap-3 rounded-lg px-4 py-3 text-sm ring-1 {{ $booking->isOverdue() ? 'bg-red-500/10 text-red-200 ring-red-500/30' : 'bg-sky-500/10 text-sky-100 ring-sky-500/25' }}">
+                        <x-icon :name="$booking->isOverdue() ? 'warning' : 'car'" class="size-5" />
+                        <span>
+                            @if ($booking->isOverdue())
+                                <span class="font-semibold">Your return is overdue.</span> It was due {{ $booking->returnDueAt()->format('l, d M \a\t g:i A') }} — late fees apply for each started day.
+                            @else
+                                <span class="font-semibold">Enjoy your trip!</span> Please return by {{ $booking->returnDueAt()->format('l, d M \a\t g:i A') }} with the same fuel level.
+                            @endif
+                        </span>
+                    </div>
+                @elseif ($booking->isCompleted())
+                    <p class="mt-5 text-sm text-mute">Trip completed {{ $booking->completed_at?->format('d M Y') }}. Thanks for driving with EasyCar!</p>
+                @elseif ($booking->isApproved() && $booking->approval_notes)
                     <p class="mt-5 rounded-lg bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 ring-1 ring-emerald-500/25"><span class="font-semibold">Note from our team:</span> {{ $booking->approval_notes }}</p>
                 @elseif ($booking->isPending())
                     <p class="mt-5 text-sm text-mute">Our branch team reviews bookings within one business day. You'll get an email the moment it's confirmed.</p>
@@ -74,6 +89,11 @@
                             <div class="text-right">
                                 <p class="text-lg font-semibold">RM {{ number_format($car->pivot->price, 2) }}</p>
                                 <a href="{{ route('cars.show', $car) }}" class="mt-1 inline-flex items-center gap-1 text-xs text-mute hover:text-white"><x-icon name="cube" class="size-3.5" /> View in 3D</a>
+                                @foreach (['pickup' => 'Pick-up report', 'return' => 'Return report'] as $type => $label)
+                                    @if ($report = $booking->inspectionFor($car->id, $type))
+                                        <a href="{{ route('inspections.show', $report) }}" class="mt-1 flex items-center justify-end gap-1 text-xs text-mute hover:text-white"><x-icon name="receipt" class="size-3.5" /> {{ $label }}</a>
+                                    @endif
+                                @endforeach
                             </div>
                         </div>
                     @endforeach
@@ -91,6 +111,10 @@
                         <div><dt class="label">Status</dt><dd><x-status-badge :booking="$booking" /></dd></div>
                     </dl>
                     <div class="divider mt-6 pt-5 text-sm text-mute">
+                        <p class="font-semibold text-white">Rental policy</p>
+                        <p class="mt-1">Pick up from {{ $booking->pickupDueAt()->format('g:i A') }} on {{ $booking->start_date->format('d M') }}; return by {{ $booking->returnDueAt()->format('g:i A') }} on {{ $booking->end_date->format('d M') }} ({{ config('rentals.late_grace_minutes') }} min grace). Late returns are charged per started day at the daily rate. Please return with the same fuel level — top-ups are RM {{ number_format(config('rentals.fuel_charge_per_eighth'), 2) }} per ⅛ tank.@if (config('rentals.daily_km_allowance')) Includes {{ config('rentals.daily_km_allowance') }} km/day; extra km RM {{ number_format(config('rentals.excess_km_rate'), 2) }} each.@endif</p>
+                    </div>
+                    <div class="divider mt-5 pt-5 text-sm text-mute">
                         <p class="font-semibold text-white">Bring to pick-up</p>
                         <p class="mt-1">Driving licence, IC or passport, and this reference: <span class="font-mono text-white">{{ $booking->reference }}</span>.</p>
                     </div>
@@ -107,7 +131,7 @@
                                     @foreach ($booking->payments as $payment)
                                         <tr>
                                             <td class="text-mute">{{ $payment->created_at->format('d M Y, g:i A') }}</td>
-                                            <td>{{ $payment->gatewayLabel() }}</td>
+                                            <td>{{ $payment->gatewayLabel() }}<span class="block text-xs text-subtle">{{ $payment->purposeLabel() }}</span></td>
                                             <td><x-payment-badge :status="$payment->status" />@if ($payment->failure_reason && ! $payment->isPaid())<p class="mt-1 text-xs text-subtle">{{ $payment->failure_reason }}</p>@endif</td>
                                             <td class="text-right font-semibold">RM {{ number_format($payment->amount, 2) }}</td>
                                         </tr>
@@ -127,7 +151,7 @@
                         <p class="display mt-1 text-5xl">RM {{ number_format($booking->total_price, 2) }}</p>
                         <div class="mt-3 flex items-center gap-2">
                             <x-payment-badge :status="$booking->payment_status" />
-                            @if ($booking->isPaid() && ($paid = $booking->payments->firstWhere('status', \App\Enums\PaymentStatus::Paid)))
+                            @if ($booking->isPaid() && ($paid = $booking->payments->where('purpose', 'booking')->firstWhere('status', \App\Enums\PaymentStatus::Paid)))
                                 <span class="text-xs text-subtle">via {{ $paid->gatewayLabel() }} · {{ $paid->paid_at?->format('d M, g:i A') }}</span>
                             @endif
                         </div>
@@ -171,6 +195,34 @@
                         </div>
                     @endif
                 </section>
+
+                @if ($booking->charges->isNotEmpty())
+                    <section class="card overflow-hidden" id="extras">
+                        <div class="border-b border-line p-6">
+                            <p class="text-sm text-mute">Extra charges</p>
+                            <p class="display mt-1 text-4xl {{ $outstanding > 0 ? 'text-amber-300' : '' }}">RM {{ number_format($outstanding, 2) }} <span class="font-sans text-sm tracking-normal text-subtle">{{ $outstanding > 0 ? 'due' : 'outstanding' }}</span></p>
+                            <ul class="mt-4 space-y-2 text-sm">
+                                @foreach ($booking->charges as $charge)
+                                    <li class="flex items-start justify-between gap-3">
+                                        <span class="{{ $charge->isVoided() ? 'text-subtle line-through' : 'text-mute' }}">{{ $charge->description }}</span>
+                                        <span class="flex shrink-0 items-center gap-2"><span class="font-semibold {{ $charge->isVoided() ? 'text-subtle line-through' : '' }}">RM {{ number_format($charge->amount, 2) }}</span>@php($m = $charge->statusMeta())<x-badge :tone="$m['tone']">{{ $m['label'] }}</x-badge></span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        @if ($booking->canPayCharges() && ! empty($gateways))
+                            <form method="POST" action="{{ route('bookings.charges.pay', $booking) }}" class="space-y-3 p-6" x-data="{ busy: false }" @submit="busy = true">
+                                @csrf
+                                <label class="label" for="charges-gateway">Pay with</label>
+                                <select id="charges-gateway" name="gateway" class="input">
+                                    @foreach ($gateways as $key => $gw)<option value="{{ $key }}" @selected($key === $defaultGateway)>{{ $gw['label'] }}</option>@endforeach
+                                </select>
+                                <button class="btn btn-primary w-full" :disabled="busy"><x-icon name="lock" class="size-4" /> Pay RM {{ number_format($outstanding, 2) }}</button>
+                                <p class="text-xs text-subtle">Questions about a charge? Call the branch before paying — we'll review it with you.</p>
+                            </form>
+                        @endif
+                    </section>
+                @endif
 
                 <section class="card card-pad text-sm text-mute">
                     <p class="font-semibold text-white">Need a hand?</p>
