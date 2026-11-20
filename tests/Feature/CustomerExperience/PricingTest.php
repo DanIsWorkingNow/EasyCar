@@ -11,6 +11,7 @@ use App\Models\PromoCode;
 use App\Models\User;
 use App\Services\BookingCreationService;
 use App\Services\PaymentService;
+use Database\Seeders\CustomerExperienceSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -26,8 +27,8 @@ beforeEach(function () {
     $this->start = now()->addDays(5)->toDateString();
     $this->end = now()->addDays(7)->toDateString(); // 3 days → RM 300 rental
 
-    $this->seat = Addon::create(['name' => 'Child seat', 'pricing' => Addon::PER_DAY, 'price' => 10, 'max_quantity' => 2]);
-    $this->driver = Addon::create(['name' => 'Additional driver', 'pricing' => Addon::PER_BOOKING, 'price' => 15, 'max_quantity' => 1]);
+    $this->seat = Addon::create(['name' => 'Booster seat (test)', 'pricing' => Addon::PER_DAY, 'price' => 10, 'max_quantity' => 2]);
+    $this->driver = Addon::create(['name' => 'Second driver (test)', 'pricing' => Addon::PER_BOOKING, 'price' => 15, 'max_quantity' => 1]);
 });
 
 function book(array $addons = [], ?string $promo = null, ?User $user = null, ?Car $car = null): Booking
@@ -142,7 +143,7 @@ it('puts add-ons and the discount on the tax invoice', function () {
 });
 
 it('lets customers add extras and apply a code in the booking flow', function () {
-    PromoCode::create(['code' => 'WELCOME10', 'type' => 'percent', 'value' => 10, 'per_user_limit' => 1]);
+    PromoCode::create(['code' => 'HELLO10', 'type' => 'percent', 'value' => 10, 'per_user_limit' => 1]);
     $this->actingAs($this->user);
 
     Livewire::test(CarAvailabilityPicker::class, ['preselectedCarId' => $this->car->id])
@@ -153,10 +154,10 @@ it('lets customers add extras and apply a code in the booking flow', function ()
         ->set('promoInput', 'nope')
         ->call('applyPromo')
         ->assertHasErrors('promo_code')
-        ->set('promoInput', 'welcome10')
+        ->set('promoInput', 'hello10')
         ->call('applyPromo')
         ->assertHasNoErrors('promo_code')
-        ->assertSet('appliedPromo', 'WELCOME10')
+        ->assertSet('appliedPromo', 'HELLO10')
         ->assertViewHas('quote', fn ($q) => $q['total'] === 324.0) // (300 + 60) × 0.9
         ->set('acceptTerms', true)
         ->call('createBooking')
@@ -182,4 +183,19 @@ it('accepts add-ons and a promo code through the API', function () {
         'start_date' => now()->addDays(20)->toDateString(), 'end_date' => now()->addDays(21)->toDateString(),
         'cars' => [$this->car->id], 'promo_code' => 'BOGUS',
     ])->assertUnprocessable()->assertJsonValidationErrors('promo_code');
+});
+
+it('creates the default extras and launch codes on migrate, without overwriting admin edits', function () {
+    // RefreshDatabase ran every migration, including the data migration.
+    expect(Addon::whereIn('name', ['Full protection (CDW)', 'Child seat', 'GPS navigator', 'Additional driver'])->count())->toBe(4)
+        ->and(PromoCode::whereIn('code', ['WELCOME10', 'WEEKEND20'])->count())->toBe(2);
+
+    Addon::where('name', 'GPS navigator')->update(['price' => 12]);
+    PromoCode::where('code', 'WELCOME10')->update(['is_active' => false]);
+
+    (new CustomerExperienceSeeder)->run(); // e.g. a later db:seed
+
+    expect(Addon::where('name', 'GPS navigator')->count())->toBe(1)
+        ->and(Addon::where('name', 'GPS navigator')->value('price'))->toEqual(12)
+        ->and(PromoCode::where('code', 'WELCOME10')->value('is_active'))->toBeFalsy();
 });

@@ -34,6 +34,9 @@ Commit hashes refer to `main`.
   `BookingResource` exposes the new fields.
 
 ### Changed
+- The default extras and launch codes are created by a data migration, so
+  existing installs get them on `php artisan migrate` without a separate
+  seeding step. Missing rows only; admin edits are never overwritten.
 - Editing a booking re-prices per-day extras and recomputes an applied
   promo discount for the new subtotal.
 

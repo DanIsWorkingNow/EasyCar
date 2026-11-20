@@ -93,8 +93,9 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 
 - **My List:** customers save cars with the heart on any tile or car page; saved cars appear at `/my-list` and as a row on the storefront and home page.
 - **Reviews:** only customers with a completed booking can review a car, once per car per booking, within `REVIEWS_WINDOW_DAYS` (default 90) of completion. Staff reply or hide reviews in **Operations → Reviews**. Car pages output schema.org `AggregateRating` for search results.
-- **Promo codes** (**Admin → Promotions**): percent or fixed, with optional cap, minimum spend, validity window, total and per-customer limits, and first-booking-only. A redemption is any booking using the code that isn't cancelled or rejected, so cancelling frees it up. Seeded demo codes: `WELCOME10`, `WEEKEND20`.
+- **Promo codes** (**Admin → Promotions**): percent or fixed, with optional cap, minimum spend, validity window, total and per-customer limits, and first-booking-only. A redemption is any booking using the code that isn't cancelled or rejected, so cancelling frees it up. `WELCOME10` and `WEEKEND20` are created automatically.
 - **Extras** (**Admin → Extras**): priced per day or per trip, with a max quantity. Prices are snapshotted on each booking, so changes apply only to new bookings.
+- **No manual seeding:** `php artisan migrate` (run by the deploy script) creates the four default extras and the two launch codes on new and existing installs. It only adds missing rows, so it never overwrites an extra or code an admin has edited.
 - The booking total is `rental + extras − discount`. Invoices itemise extras and show the discount as a negative line. The API accepts `addons: [{id, quantity}]` and `promo_code` on `POST /api/v1/bookings`.
 
 ## 3D models
@@ -106,7 +107,7 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 ## Operations
 
 ```bash
-php artisan test                 # 149 Pest tests
+php artisan test                 # 150 Pest tests
 ./vendor/bin/pint --test         # code style
 ./vendor/bin/phpstan analyse     # Larastan
 npm run build                    # production assets

@@ -6,7 +6,14 @@ use App\Models\Addon;
 use App\Models\PromoCode;
 use Illuminate\Database\Seeder;
 
-/** Default rental extras and a couple of launch promo codes. Idempotent. */
+/**
+ * Default rental extras and two launch promo codes.
+ *
+ * Runs automatically from the 2026_11_21_000002 migration, so existing
+ * installs get them on `php artisan migrate` (the deploy script runs it).
+ * Only creates rows that are missing — it never overwrites an extra or
+ * code an admin has since edited, and is safe to run again.
+ */
 class CustomerExperienceSeeder extends Seeder
 {
     public function run(): void
@@ -19,16 +26,16 @@ class CustomerExperienceSeeder extends Seeder
         ];
 
         foreach ($addons as $addon) {
-            Addon::updateOrCreate(['name' => $addon['name']], $addon);
+            Addon::firstOrCreate(['name' => $addon['name']], $addon);
         }
 
-        PromoCode::updateOrCreate(['code' => 'WELCOME10'], [
+        PromoCode::firstOrCreate(['code' => 'WELCOME10'], [
             'description' => '10% off your first booking',
             'type' => PromoCode::PERCENT, 'value' => 10, 'max_discount' => 100,
             'per_user_limit' => 1, 'first_booking_only' => true, 'is_active' => true,
         ]);
 
-        PromoCode::updateOrCreate(['code' => 'WEEKEND20'], [
+        PromoCode::firstOrCreate(['code' => 'WEEKEND20'], [
             'description' => 'RM 20 off bookings over RM 200',
             'type' => PromoCode::FIXED, 'value' => 20, 'min_spend' => 200,
             'per_user_limit' => 3, 'is_active' => true,
