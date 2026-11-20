@@ -32,11 +32,11 @@ class BookingCreationService
      *
      * @throws ValidationException
      */
-    public function create(User $user, array $carIds, string $startDate, string $endDate): Booking
+    public function create(User $user, array $carIds, string $startDate, string $endDate, ?string $acceptedFromIp = null): Booking
     {
         $carIds = $this->normaliseIds($carIds);
 
-        return DB::transaction(function () use ($user, $carIds, $startDate, $endDate) {
+        return DB::transaction(function () use ($user, $carIds, $startDate, $endDate, $acceptedFromIp) {
             // Serialise concurrent submissions for the same cars so two
             // customers can't both pass the availability check.
             Car::whereIn('id', $carIds)->lockForUpdate()->get();
@@ -53,6 +53,11 @@ class BookingCreationService
                 'total_days' => $totalDays,
                 'status' => 'pending',
                 'total_price' => 0,
+                // Rental agreement acceptance (Phase 3). Null when the
+                // caller didn't collect consent (e.g. older API clients).
+                'terms_version' => $acceptedFromIp !== null ? config('compliance.terms_version') : null,
+                'terms_accepted_at' => $acceptedFromIp !== null ? now() : null,
+                'terms_accepted_ip' => $acceptedFromIp,
             ]);
 
             $booking->update(['total_price' => $this->attachCars($booking, $carIds, $startDate, $endDate, $totalDays)]);

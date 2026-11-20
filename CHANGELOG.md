@@ -5,7 +5,53 @@ integration session and grouped in [Keep a Changelog](https://keepachangelog.com
 style (`Added` / `Changed` / `Fixed`). Entries are reverse-chronological.
 Commit hashes refer to `main`.
 
-## [Unreleased] — 2026-11-19
+## [Unreleased] — 2026-11-20
+
+### Phase 3 — Trust & compliance
+See `docs/ROADMAP.md` for the full 10-phase plan this belongs to.
+
+### Added
+- **Driver verification (KYC):** customers submit their licence number,
+  expiry, date of birth, IC/passport number and photos. Numbers are
+  encrypted at rest; documents live on the private disk and are streamed
+  only to the owner and staff. Resubmitting deletes replaced files and
+  goes back to review. Staff use an **Operations → Verifications** queue to
+  verify or send back with a reason (the customer is emailed), with a
+  console badge for pending reviews.
+- **Enforcement** (`COMPLIANCE_REQUIRE_VERIFIED_DRIVER`, default on):
+  `Booking::approvalBlocker()` / `driverBlocker()` stop approval and pick-up
+  until the driver is verified, the licence is valid through the return
+  date, and they meet the minimum age. The exact reason is shown to staff,
+  and the customer gets a matching prompt on their booking.
+- **Rental agreement:** the booking flow requires accepting the Terms of
+  Rental. The version, time and IP are stored on the booking (API:
+  optional `accept_terms`). Public `/terms` and `/privacy` (PDPA) pages,
+  generated from the live rental policy, linked in the footer and emails.
+- **Tax invoices & credit notes:** a `PaymentObserver` issues an immutable,
+  gap-free numbered invoice for every settled payment (rental or extras,
+  online or counter) and a credit note for every refund. Seller, buyer and
+  lines are snapshotted; tax is extracted from tax-inclusive prices when
+  `INVOICE_TAX_RATE` is set. PDFs (dompdf, font-subset, ~25 KB) are
+  attached to receipt and refund emails and linked from the booking and
+  admin pages. Access: the customer, staff at that branch, admins.
+- **Branded email templates** for every notification.
+- `docs/ROADMAP.md` (10 phases) and 17 new tests (126 total).
+
+### Changed
+- New dependency: `barryvdh/laravel-dompdf` ^3.1 (adds dompdf and its
+  font/SVG/CSS libraries; no existing package versions changed).
+- `phpunit.xml` sets `COMPLIANCE_REQUIRE_VERIFIED_DRIVER=false` so
+  pre-existing tests don't need verified drivers; the compliance tests
+  enable it explicitly.
+
+**Upgrade:** `composer install && php artisan migrate`. Set the `COMPANY_*`
+and `INVOICE_*` variables before taking real payments. Existing customers
+will need to verify before their next booking can be approved (or set
+`COMPLIANCE_REQUIRE_VERIFIED_DRIVER=false` while they catch up).
+
+---
+
+## Phase 2 — Rental operations — 2026-11-19 (PR #2)
 
 ### Phase 2 — Rental operations
 Closes the booking lifecycle. Before this, nothing ever marked a booking

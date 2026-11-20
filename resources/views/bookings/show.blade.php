@@ -28,6 +28,26 @@
             </x-slot:actions>
         </x-page-header>
 
+        @if (in_array($booking->status, ['pending', 'approved']) && ! $booking->picked_up_at && $booking->driverBlocker())
+            @php
+                $driver = auth()->user()->driverProfile;
+                [$headline, $detail, $cta] = match (true) {
+                    $driver === null => ['Verify your driving licence to get this booking confirmed', 'Upload your licence and IC/passport once — it takes two minutes and covers every future trip.', 'Verify now'],
+                    $driver->status->value === 'pending' => ['We’re checking your driving licence', 'Our team usually verifies documents within one business day. We’ll email you, then confirm this booking.', 'View status'],
+                    $driver->status->value === 'rejected' => ['Your documents need another look', $driver->rejection_reason.' — please update them so we can confirm this booking.', 'Update documents'],
+                    default => ['Update your driving licence', 'Your licence on file doesn’t cover this trip (expiry or age requirement). Please upload a current licence.', 'Update licence'],
+                };
+            @endphp
+            <a href="{{ route('verification.show') }}" class="mb-6 flex flex-col gap-3 rounded-xl bg-gradient-to-r from-sky-500/15 to-transparent p-5 ring-1 ring-sky-500/30 sm:flex-row sm:items-center">
+                <x-icon name="shield" class="size-6 text-sky-300" />
+                <div class="flex-1">
+                    <p class="font-semibold">{{ $headline }}</p>
+                    <p class="text-sm text-white/70">{{ $detail }}</p>
+                </div>
+                <span class="btn btn-light btn-sm">{{ $cta }}</span>
+            </a>
+        @endif
+
         {{-- Progress --}}
         <div class="card card-pad mb-8">
             @if ($terminal)
@@ -126,7 +146,7 @@
                         <h2 class="px-5 pt-5 text-lg font-semibold">Payment history</h2>
                         <div class="overflow-x-auto">
                             <table class="table-ec mt-3">
-                                <thead><tr><th>Date</th><th>Method</th><th>Status</th><th class="text-right">Amount</th></tr></thead>
+                                <thead><tr><th>Date</th><th>Method</th><th>Status</th><th class="text-right">Amount</th><th></th></tr></thead>
                                 <tbody>
                                     @foreach ($booking->payments as $payment)
                                         <tr>
@@ -134,6 +154,11 @@
                                             <td>{{ $payment->gatewayLabel() }}<span class="block text-xs text-subtle">{{ $payment->purposeLabel() }}</span></td>
                                             <td><x-payment-badge :status="$payment->status" />@if ($payment->failure_reason && ! $payment->isPaid())<p class="mt-1 text-xs text-subtle">{{ $payment->failure_reason }}</p>@endif</td>
                                             <td class="text-right font-semibold">RM {{ number_format($payment->amount, 2) }}</td>
+                                            <td class="text-right whitespace-nowrap">
+                                                @foreach ($payment->invoices as $doc)
+                                                    <a href="{{ route('invoices.show', $doc) }}" class="inline-flex items-center gap-1 text-xs text-mute hover:text-white"><x-icon name="receipt" class="size-3.5" /> {{ $doc->isCreditNote() ? 'Credit note' : 'Invoice' }}</a>
+                                                @endforeach
+                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>

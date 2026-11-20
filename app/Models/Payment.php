@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\PaymentStatus;
+use App\Observers\PaymentObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +15,7 @@ use Illuminate\Support\Str;
  * (abandoned card checkout, then a successful FPX one); at most one ends
  * up Paid. Routed by uuid so payment URLs never expose sequential ids.
  */
+#[ObservedBy(PaymentObserver::class)]
 class Payment extends Model
 {
     /** The rental itself. */
@@ -74,6 +77,17 @@ class Payment extends Model
     public function charges(): HasMany
     {
         return $this->hasMany(BookingCharge::class);
+    }
+
+    /** @return HasMany<Invoice, $this> */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function invoice(): ?Invoice
+    {
+        return $this->invoices->firstWhere('kind', Invoice::INVOICE);
     }
 
     public function isForCharges(): bool

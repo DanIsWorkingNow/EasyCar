@@ -153,9 +153,21 @@
                     </div>
                 </div>
 
-                @if ($errors->hasAny(['selectedCarIds', 'startDate', 'endDate']))
+                <label class="flex items-start gap-3 text-sm text-mute">
+                    <input type="checkbox" wire:model="acceptTerms" class="checkbox mt-0.5">
+                    <span>I accept the <a href="{{ route('legal.terms') }}" target="_blank" class="text-white underline">Terms of Rental</a> and have read the <a href="{{ route('legal.privacy') }}" target="_blank" class="text-white underline">Privacy Notice</a>.</span>
+                </label>
+
+                @if ($errors->hasAny(['selectedCarIds', 'startDate', 'endDate', 'acceptTerms']))
                     <p class="flex items-start gap-2 rounded-lg bg-red-500/10 px-3 py-2.5 text-sm text-red-300 ring-1 ring-red-500/30" role="alert">
-                        <x-icon name="warning" class="mt-0.5 size-4 shrink-0" /> {{ $errors->first('selectedCarIds') ?: ($errors->first('startDate') ?: $errors->first('endDate')) }}
+                        <x-icon name="warning" class="mt-0.5 size-4 shrink-0" /> {{ $errors->first('selectedCarIds') ?: ($errors->first('startDate') ?: ($errors->first('endDate') ?: $errors->first('acceptTerms'))) }}
+                    </p>
+                @endif
+
+                @if (config('compliance.require_verified_driver') && ! auth()->user()->isVerifiedDriver())
+                    <p class="flex items-start gap-2 text-xs leading-relaxed text-sky-200/90">
+                        <x-icon name="shield" class="size-4 shrink-0" />
+                        <span>You can reserve now. We'll confirm the booking once your <a href="{{ route('verification.show') }}" class="underline" target="_blank">driving licence is verified</a>.</span>
                     </p>
                 @endif
 

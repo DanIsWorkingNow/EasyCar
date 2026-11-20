@@ -36,6 +36,8 @@ class CarAvailabilityPicker extends Component
 
     public array $selectedCarIds = [];
 
+    public bool $acceptTerms = false;
+
     public function mount(?int $preselectedCarId = null): void
     {
         if ($preselectedCarId && Car::whereKey($preselectedCarId)->exists()) {
@@ -50,6 +52,7 @@ class CarAvailabilityPicker extends Component
             'endDate' => 'required|date|after:startDate',
             'selectedCarIds' => 'required|array|min:1|max:'.BookingCreationService::MAX_CARS_PER_PERIOD,
             'selectedCarIds.*' => 'integer|exists:cars,id',
+            'acceptTerms' => 'accepted',
         ];
     }
 
@@ -62,6 +65,7 @@ class CarAvailabilityPicker extends Component
             'endDate.after' => 'Return must be after pick-up.',
             'selectedCarIds.required' => 'Select at least one car.',
             'selectedCarIds.max' => 'You can select at most 2 cars.',
+            'acceptTerms.accepted' => 'Please accept the Terms of Rental to continue.',
         ];
     }
 
@@ -102,7 +106,7 @@ class CarAvailabilityPicker extends Component
         $this->validate();
 
         try {
-            $booking = $service->create(Auth::user(), $this->selectedCarIds, $this->startDate, $this->endDate);
+            $booking = $service->create(Auth::user(), $this->selectedCarIds, $this->startDate, $this->endDate, (string) request()->ip());
         } catch (ValidationException $e) {
             // A car was taken between page load and submit, or the
             // customer already holds two cars for these dates.

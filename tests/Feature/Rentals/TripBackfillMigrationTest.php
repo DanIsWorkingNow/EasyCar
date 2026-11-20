@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 uses(RefreshDatabase::class);
 
 it('marks confirmed bookings that ended before handovers existed as completed', function () {
-    $this->artisan('migrate:rollback', ['--step' => 1])->assertSuccessful();
+    $migration = 'database/migrations/2026_11_19_000003_add_trip_fields_to_bookings_and_payments.php';
+    $this->artisan('migrate:rollback', ['--path' => $migration])->assertSuccessful();
 
     $user = User::factory()->create();
     $row = fn (string $ref, string $start, string $end, string $status) => [
@@ -22,7 +23,7 @@ it('marks confirmed bookings that ended before handovers existed as completed', 
         $row('EC-REJD0001', now()->subDays(10)->toDateString(), now()->subDays(8)->toDateString(), 'rejected'),
     ]);
 
-    $this->artisan('migrate')->assertSuccessful();
+    $this->artisan('migrate', ['--path' => $migration])->assertSuccessful();
 
     $past = Booking::where('reference', 'EC-PAST0001')->first();
     expect($past->status)->toBe('completed')

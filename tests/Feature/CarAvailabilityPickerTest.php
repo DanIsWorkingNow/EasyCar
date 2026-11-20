@@ -51,6 +51,7 @@ it('creates a booking end-to-end and redirects to the booking page to pay', func
         ->set('startDate', now()->addDays(3)->toDateString())
         ->set('endDate', now()->addDays(5)->toDateString())
         ->call('toggleCar', $car->id)
+        ->set('acceptTerms', true)
         ->call('createBooking');
 
     $booking = Booking::where('user_id', $user->id)->firstOrFail();

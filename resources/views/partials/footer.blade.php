@@ -49,7 +49,7 @@
     <div class="border-t border-line">
         <div class="container-ec flex flex-col items-center justify-between gap-2 py-6 text-xs text-subtle sm:flex-row">
             <p>&copy; {{ now()->year }} {{ config('app.name', 'EasyCar') }}. All rights reserved.</p>
-            <p>Prices in Malaysian Ringgit (MYR). Bookings require 2 days' notice.</p>
+            <p class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1"><a href="{{ route('legal.terms') }}" class="hover:text-white">Terms of Rental</a><a href="{{ route('legal.privacy') }}" class="hover:text-white">Privacy Notice</a><span>Prices in MYR. Bookings require 2 days' notice.</span></p>
         </div>
     </div>
 </footer>

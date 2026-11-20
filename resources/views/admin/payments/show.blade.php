@@ -21,6 +21,7 @@
                     <div><dt class="label">Status</dt><dd><x-payment-badge :status="$payment->status" /></dd></div>
                     <div><dt class="label">Booking</dt><dd class="font-mono">@if ($payment->booking)<a href="{{ route('admin.bookings.show', $payment->booking) }}" class="hover:underline">{{ $payment->booking->reference }}</a>@endif</dd></div>
                     <div><dt class="label">Gateway reference</dt><dd class="font-mono text-xs break-all">{{ $payment->gateway_reference ?? '—' }}</dd></div>
+                    <div><dt class="label">Documents</dt><dd class="flex flex-wrap gap-2 text-sm">@forelse ($payment->invoices as $doc)<a href="{{ route('invoices.show', $doc) }}" class="underline">{{ $doc->number }}</a>@empty<span class="text-subtle">—</span>@endforelse</dd></div>
                     <div><dt class="label">Internal ID</dt><dd class="font-mono text-xs break-all">{{ $payment->uuid }}</dd></div>
                     @if ($payment->gateway === 'counter')
                         <div><dt class="label">Taken at counter</dt><dd class="text-sm">{{ \App\Payments\Gateways\CounterGateway::METHODS[$payment->meta['method'] ?? ''] ?? '—' }} · by {{ $payment->meta['recorded_by_name'] ?? 'staff' }}</dd></div>

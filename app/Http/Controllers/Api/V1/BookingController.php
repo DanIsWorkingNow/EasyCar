@@ -61,11 +61,15 @@ class BookingController extends Controller
             'end_date' => 'required|date|after:start_date',
             'cars' => 'required|array|min:1|max:2',
             'cars.*' => 'integer|exists:cars,id',
+            'accept_terms' => 'sometimes|accepted',
         ]);
 
         // Availability, the per-customer car limit and pricing all live in
         // BookingCreationService, shared with the web and Livewire flows.
-        $booking = $bookings->create($request->user(), $validated['cars'], $validated['start_date'], $validated['end_date']);
+        $booking = $bookings->create(
+            $request->user(), $validated['cars'], $validated['start_date'], $validated['end_date'],
+            $request->boolean('accept_terms') ? (string) $request->ip() : null,
+        );
 
         $request->user()->notify(new BookingConfirmed($booking));
 

@@ -52,7 +52,9 @@ class BookingController extends Controller
     {
         $validated = $this->validateBooking($request);
 
-        $booking = $bookings->create($request->user(), $validated['cars'], $validated['start_date'], $validated['end_date']);
+        $request->validate(['accept_terms' => 'accepted'], ['accept_terms.accepted' => 'Please accept the Terms of Rental to continue.']);
+
+        $booking = $bookings->create($request->user(), $validated['cars'], $validated['start_date'], $validated['end_date'], (string) $request->ip());
 
         $request->user()->notify(new BookingConfirmed($booking));
 
@@ -64,7 +66,7 @@ class BookingController extends Controller
     {
         $this->authorize('view', $booking);
 
-        $booking->load(['cars.branch', 'payments' => fn ($q) => $q->latest(), 'inspections', 'charges']);
+        $booking->load(['cars.branch', 'payments' => fn ($q) => $q->latest()->with('invoices'), 'inspections', 'charges', 'user.driverProfile']);
 
         return view('bookings.show', [
             'booking' => $booking,

@@ -8,13 +8,17 @@ use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CarController;
+use App\Http\Controllers\DriverVerificationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InspectionController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\LegalController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Ops\BoardController as OpsBoardController;
 use App\Http\Controllers\Ops\ChargeController as OpsChargeController;
 use App\Http\Controllers\Ops\HandoverController as OpsHandoverController;
+use App\Http\Controllers\Ops\VerificationController as OpsVerificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\ProfileController;
@@ -41,6 +45,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', LandingController::class)->name('landing');
 Route::get('/cars', [CarController::class, 'index'])->name('cars.index');
 Route::get('/cars/{car}', [CarController::class, 'show'])->name('cars.show');
+Route::get('/terms', [LegalController::class, 'terms'])->name('legal.terms');
+Route::get('/privacy', [LegalController::class, 'privacy'])->name('legal.privacy');
 
 Auth::routes();
 
@@ -68,6 +74,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{payment}/sandbox', [PaymentController::class, 'sandbox'])->name('payments.sandbox.show');
     Route::post('/payments/{payment}/sandbox', [PaymentController::class, 'completeSandbox'])->name('payments.sandbox.complete');
 
+    Route::get('/account/verification', [DriverVerificationController::class, 'show'])->name('verification.show');
+    Route::post('/account/verification', [DriverVerificationController::class, 'store'])->middleware('throttle:10,1')->name('verification.store');
+    Route::get('/verification/{profile}/documents/{document}', [DriverVerificationController::class, 'document'])->name('verification.document');
+
+    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'password'])->name('profile.password');
@@ -90,6 +103,10 @@ Route::middleware(['auth', 'role:admin|staff'])->prefix('ops')->name('ops.')->gr
     Route::post('/bookings/{booking}/charges', [OpsChargeController::class, 'store'])->name('charges.store');
     Route::post('/bookings/{booking}/charges/collect', [OpsChargeController::class, 'collect'])->name('charges.collect');
     Route::post('/charges/{charge}/void', [OpsChargeController::class, 'void'])->name('charges.void');
+
+    Route::get('/verifications', [OpsVerificationController::class, 'index'])->name('verifications.index');
+    Route::get('/verifications/{profile}', [OpsVerificationController::class, 'show'])->name('verifications.show');
+    Route::put('/verifications/{profile}', [OpsVerificationController::class, 'update'])->name('verifications.update');
 });
 
 // ── Admin console ─────────────────────────────────────────────────────
