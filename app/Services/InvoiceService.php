@@ -98,6 +98,15 @@ class InvoiceService
             }
         }
 
+        if (! $payment->isForCharges() && (float) $booking->points_discount > 0) {
+            $lines[] = [
+                'description' => 'EasyCar Rewards — '.number_format($booking->points_redeemed).' points',
+                'quantity' => 1,
+                'unit_amount' => -(float) $booking->points_discount,
+                'amount' => -(float) $booking->points_discount,
+            ];
+        }
+
         // The invoice must always equal what was actually paid.
         if (abs(array_sum(array_column($lines, 'amount')) - (float) $payment->amount) > 0.009) {
             $lines = [[

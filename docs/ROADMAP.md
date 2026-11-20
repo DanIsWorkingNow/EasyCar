@@ -11,7 +11,7 @@ and growth, then polish and scale.
 | 2 | **Rental operations** — pickup/return handovers, trip lifecycle, extra charges, operations board | ✅ Done (PR #2) | Bookings actually finish; disputes have evidence |
 | 3 | **Trust & compliance** — driver verification (licence + IC/passport), rental agreement acceptance, tax invoices & receipts, branded emails, Terms/Privacy (PDPA) | ✅ Done (PR #3) | Legally rentable cars, professional paperwork, fewer fraud and no-show losses |
 | 4 | **Customer experience** — "My List" favourites, verified reviews & ratings, promo codes, paid add-ons (child seat, GPS, insurance) | ✅ Done (PR #4) | Social proof, repeat visits, higher basket value |
-| 5 | **Pricing & revenue** — seasonal/weekend pricing, weekly & monthly rates, security-deposit holds, loyalty points | Planned | Competitive prices, protected margins, retention |
+| 5 | **Pricing & revenue** — seasonal/weekend pricing, weekly & monthly rates, security-deposit holds, loyalty points | ✅ Done (PR #5) | Competitive prices, protected margins, retention |
 | 6 | **Fleet & maintenance** — service schedules by km/date, maintenance log & costs, road-tax/insurance/Puspakom expiry alerts, automatic unavailability while in service | Planned | Safe, legal cars; fewer breakdowns and last-minute cancellations |
 | 7 | **Analytics & reporting** — revenue & utilisation per car/branch, cancellations and no-shows, cohorts, accounting (CSV/Excel) exports, scheduled reports | Planned | Decisions from data; finance can close the books |
 | 8 | **Security & privacy hardening** — 2FA for staff/admins, full activity audit log, PDPA data export & account deletion, session/device management, strict CSP | Planned | Protects customer data; enterprise-grade trust |
@@ -43,6 +43,13 @@ and growth, then polish and scale.
 - **Promo codes:** percent (with cap) or fixed; minimum spend, validity window, total and per-customer limits, first-booking-only. Redemptions are counted from live bookings, so cancelling frees one up; the code row is locked during booking to stop over-redemption. Admin **Promotions** page with redemptions and discount given.
 - **Paid extras:** per-day or per-trip add-ons with a max quantity, priced server-side and snapshotted on the booking. Admin **Extras** page.
 - `total_price = rental + addons_amount − discount_amount`, re-priced on edit; invoices list extras and a negative discount line; the API accepts `addons` and `promo_code`.
+
+## Phase 5 — Pricing & revenue (scope)
+
+- **Dynamic pricing:** each day = base × (1 + season %) × (1 + day-of-week %), highest-priority matching rule per type, optionally limited to a car type/branch. Admin **Pricing** page with a 5-week daily-rate preview per car. Existing bookings keep their price.
+- **Weekly & monthly rates:** best long-rental tier on the car hire (`PRICING_WEEKLY_DISCOUNT` 10% at 7+ days, `PRICING_MONTHLY_DISCOUNT` 20% at 28+).
+- **Security deposits:** amount per car → per type → default, snapshotted when booked; taken at the first pick-up (card hold, cash, transfer); after the return, released or used to settle extra charges (when it covers them) with the rest released.
+- **EasyCar Rewards:** points ledger. Earn on completion (1 pt per RM 1), redeem from 100 pts up to 50% of a booking (100 pts = RM 5), returned on cancel/reject or when re-pricing lowers the cap; admin adjustments; customer Rewards page; invoices show the points line; API `use_points`.
 
 ## Definition of done (every phase)
 

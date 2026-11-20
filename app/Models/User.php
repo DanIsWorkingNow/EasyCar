@@ -64,6 +64,17 @@ class User extends Authenticatable
     }
 
     /** @return BelongsTo<Branch, $this> */
+    /** @return HasMany<LoyaltyTransaction, $this> */
+    public function loyaltyTransactions(): HasMany
+    {
+        return $this->hasMany(LoyaltyTransaction::class);
+    }
+
+    public function pointsBalance(): int
+    {
+        return (int) $this->loyaltyTransactions()->sum('points');
+    }
+
     /** @return BelongsToMany<Car, $this> */
     public function favourites(): BelongsToMany
     {

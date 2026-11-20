@@ -45,6 +45,10 @@ class ReturnCompleted extends Notification implements ShouldQueue
 
         // Once every car is back the booking is completed — invite a review.
         if ($i->booking->fresh()?->status === 'completed') {
+            $earned = (int) $i->booking->loyaltyTransactions()->where('type', 'earn')->sum('points');
+            if ($earned > 0) {
+                $mail->line('You earned '.number_format($earned).' EasyCar Rewards points on this trip.');
+            }
             $mail->line('How was your trip? Rating the car takes a few seconds and helps other renters.');
 
             return $mail->action('Rate your trip', route('bookings.show', $i->booking).'#reviews');

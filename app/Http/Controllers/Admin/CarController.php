@@ -103,6 +103,7 @@ class CarController extends Controller
             'description' => 'nullable|string|max:2000',
             'branch_id' => 'required|exists:branches,id',
             'price_per_day' => 'required|numeric|min:1|max:99999',
+            'deposit_amount' => 'nullable|numeric|min:0|max:99999',
             'plate_number' => ['required', 'string', 'max:20', Rule::unique('cars', 'plate_number')->ignore($car?->id)],
             'status' => ['required', Rule::in(['available', 'rented', 'maintenance'])],
             'is_featured' => 'sometimes|boolean',

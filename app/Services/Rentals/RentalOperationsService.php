@@ -13,6 +13,7 @@ use App\Notifications\PickupCompleted;
 use App\Notifications\ReturnCompleted;
 use App\Services\DashboardService;
 use App\Services\PaymentService;
+use App\Services\Pricing\DepositService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -38,6 +39,7 @@ class RentalOperationsService
     public function __construct(
         private ChargeCalculator $calculator,
         private PaymentService $payments,
+        private DepositService $deposits,
     ) {}
 
     public function pickupBlocker(Booking $booking, Car $car): ?string
@@ -106,6 +108,16 @@ class RentalOperationsService
                     $data->counterPayment['reference'] ?? null,
                     $staff,
                 );
+            }
+
+            // Refundable security deposit, once per booking (first car out).
+            if ($this->deposits->isDue($booking)) {
+                if (! $data->deposit) {
+                    throw ValidationException::withMessages([
+                        'deposit' => 'Take the RM '.number_format($booking->deposit_amount, 2).' security deposit before handing over the keys.',
+                    ]);
+                }
+                $this->deposits->collect($booking, $data->deposit, $staff);
             }
 
             $inspection = $this->createInspection($booking, $car, $staff, VehicleInspection::PICKUP, $data);

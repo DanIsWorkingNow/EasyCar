@@ -9,6 +9,7 @@
             ['Verifications', 'ops.verifications.index', 'shield', 'ops.verifications.*'],
             ['Payments', 'admin.payments.index', 'card', 'admin.payments.*'],
             ['Reviews', 'ops.reviews.index', 'star', 'ops.reviews.*'],
+            ['Pricing', 'admin.pricing.index', 'chart', 'admin.pricing.*'],
             ['Promotions', 'admin.promo-codes.index', 'tag', 'admin.promo-codes.*'],
             ['Extras', 'admin.addons.index', 'sparkles', 'admin.addons.*'],
             ['Fleet', 'admin.cars.index', 'cube', 'admin.cars.*'],

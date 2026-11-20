@@ -17,6 +17,7 @@ Built with **Laravel 12**, **Livewire 4**, **Tailwind CSS 4** and **three.js**.
 | **Rental operations** | A board per branch showing pickups, returns due, cars on trip, overdue returns and no-shows. A tablet-friendly handover form records mileage, fuel, a checklist, damage on a tap-to-mark car diagram, photos and the customer's signature. Late, fuel and mileage charges are calculated automatically. |
 | **Trust & compliance** | Driver verification (licence + IC/passport, encrypted at rest, private documents) with a staff review queue and enforcement at approval and pick-up; versioned rental-terms acceptance; Terms & PDPA Privacy pages; numbered tax invoices and credit notes as PDF, attached to receipt emails; branded email templates. |
 | **Customer experience** | "My List" favourites, verified reviews & star ratings (with moderation and public replies), promo codes, and paid extras such as CDW protection, child seats and GPS. |
+| **Pricing & revenue** | Seasonal and weekend pricing rules with a rate preview, weekly/monthly rates, refundable security deposits handled at the counter, and EasyCar Rewards points. |
 | **Admin console** | Live KPIs and charts, approval queue, bookings (filters, bulk approve, CSV export), payments (refunds, webhook log), reviews, promotions, extras, fleet (3D preview, `.glb` upload), branches, and users with audited role changes. |
 | **Staff console** | The same tools, scoped to the staff member's branch. |
 | **API** | Versioned REST API (`/api/v1`) with Sanctum tokens and tiered rate limits. A Postman environment lives in `postman/`. |
@@ -98,6 +99,13 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 - **No manual seeding:** `php artisan migrate` (run by the deploy script) creates the four default extras and the two launch codes on new and existing installs. It only adds missing rows, so it never overwrites an extra or code an admin has edited.
 - The booking total is `rental + extras − discount`. Invoices itemise extras and show the discount as a negative line. The API accepts `addons: [{id, quantity}]` and `promo_code` on `POST /api/v1/bookings`.
 
+## Pricing & revenue
+
+- **Daily rates:** base `price_per_day` × the best season rule × the best day-of-week rule for that day (**Admin → Pricing**; rules can target a car type or branch, and priority breaks ties). The page previews each car's rates for 5 weeks. Changes apply to new bookings only.
+- **Long rentals:** `PRICING_WEEKLY_DISCOUNT` (default 10%, 7+ days) and `PRICING_MONTHLY_DISCOUNT` (20%, 28+ days) off the car hire.
+- **Security deposit:** car's own amount, else `pricing.deposit.by_type`, else `PRICING_DEPOSIT_DEFAULT` (RM 200). Snapshotted on the booking; staff must record it (card pre-auth, cash or transfer) at the first pick-up when `PRICING_DEPOSIT_REQUIRED=true`. After the return, the booking page offers **Release full deposit** or **Use for charges & release rest** (only when the deposit covers all extra charges).
+- **Rewards:** `LOYALTY_POINTS_PER_RINGGIT` (1) on completed bookings; redeem from `LOYALTY_MIN_REDEEM` (100) points at `LOYALTY_POINT_VALUE` (RM 0.05) each, up to `LOYALTY_MAX_REDEEM_PERCENT` (50%) of a booking. Cancelled or rejected bookings return points. Admins adjust balances on the user's page; customers see `/rewards`.
+
 ## 3D models
 
 - The default model is generated from extruded side profiles in `resources/js/car-viewer/procedural-car.js`, with paint taken from the car's **Paint colour** field.
@@ -107,7 +115,7 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 ## Operations
 
 ```bash
-php artisan test                 # 150 Pest tests
+php artisan test                 # 164 Pest tests
 ./vendor/bin/pint --test         # code style
 ./vendor/bin/phpstan analyse     # Larastan
 npm run build                    # production assets

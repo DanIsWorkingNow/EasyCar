@@ -84,7 +84,7 @@
                                     </form>
                                 @endcan
                             </td>
-                            <td>@php($m = $charge->statusMeta())<x-badge :tone="$m['tone']">{{ $m['label'] }}</x-badge></td>
+                            <td><x-badge :tone="$charge->statusMeta()['tone']">{{ $charge->statusMeta()['label'] }}</x-badge></td>
                             <td class="text-right font-medium whitespace-nowrap">RM {{ number_format($charge->amount, 2) }}</td>
                             <td class="text-right">
                                 @if (! $charge->isPaid() && ! $charge->isVoided())
@@ -109,6 +109,59 @@
                     <x-field name="reference" label="Receipt / code" placeholder="Optional" />
                     <button class="btn btn-success" data-confirm="Record RM {{ number_format($outstanding, 2) }} as paid at the counter?"><x-icon name="cash" class="size-4" /> Record RM {{ number_format($outstanding, 2) }} paid</button>
                 </form>
+            @endcan
+        @endif
+    </section>
+@endif
+
+@if ($booking->deposit || ((float) $booking->deposit_amount > 0 && config('pricing.deposit.required') && $booking->isApproved()))
+    @php
+        $deposit = $booking->deposit;
+        $applicable = $deposit ? app(\App\Services\Pricing\DepositService::class)->applicableAmount($booking) : 0;
+    @endphp
+    <section class="card" id="deposit">
+        <div class="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+            <h2 class="flex items-center gap-2 font-semibold"><x-icon name="shield" class="size-5 text-sky-300" /> Security deposit</h2>
+            @if ($deposit)
+                <x-badge :tone="$deposit->isHeld() ? 'info' : 'success'">{{ $deposit->statusLabel() }}</x-badge>
+            @else
+                <x-badge tone="neutral">Due at pick-up</x-badge>
+            @endif
+        </div>
+        <div class="px-5 py-4 text-sm">
+            @if (! $deposit)
+                <p class="text-mute">RM {{ number_format($booking->deposit_amount, 2) }} will be taken at the counter when the car is handed over.</p>
+            @else
+                <dl class="grid gap-3 sm:grid-cols-3">
+                    <div><dt class="label">Amount</dt><dd class="font-semibold">RM {{ number_format($deposit->amount, 2) }}</dd></div>
+                    <div><dt class="label">Taken</dt><dd>{{ $deposit->methodLabel() }}<span class="block text-xs text-subtle">{{ $deposit->collected_at->format('d M, g:i A') }}{{ $deposit->reference ? ' · '.$deposit->reference : '' }}</span></dd></div>
+                    @unless ($deposit->isHeld())
+                        <div><dt class="label">Settled</dt><dd>
+                            @if ($deposit->applied_amount > 0) RM {{ number_format($deposit->applied_amount, 2) }} to charges · @endif
+                            RM {{ number_format($deposit->releasedAmount(), 2) }} released
+                            <span class="block text-xs text-subtle">{{ $deposit->settled_at?->format('d M, g:i A') }}{{ $deposit->settler ? ' · '.$deposit->settler->name : '' }}</span>
+                        </dd></div>
+                    @endunless
+                </dl>
+            @endif
+        </div>
+        @if ($deposit?->isHeld() && ! $booking->isOnTrip() && $booking->picked_up_at)
+            @can('manage-charges', $booking)
+                <div class="flex flex-wrap items-center gap-2 border-t border-line px-5 py-4">
+                    @if ($applicable > 0)
+                        <form method="POST" action="{{ route('ops.deposit.settle', $booking) }}">
+                            @csrf <input type="hidden" name="action" value="apply">
+                            <button class="btn btn-success" data-confirm="Use RM {{ number_format($applicable, 2) }} of the deposit for the extra charges and release RM {{ number_format($deposit->amount - $applicable, 2) }}?"><x-icon name="receipt" class="size-4" /> Use for charges (RM {{ number_format($applicable, 2) }}) &amp; release rest</button>
+                        </form>
+                    @endif
+                    <form method="POST" action="{{ route('ops.deposit.settle', $booking) }}">
+                        @csrf <input type="hidden" name="action" value="release">
+                        <button class="btn {{ $applicable > 0 ? 'btn-outline' : 'btn-primary' }}" data-confirm="Release the full RM {{ number_format($deposit->amount, 2) }} deposit to the customer?"><x-icon name="check" class="size-4" /> Release full deposit</button>
+                    </form>
+                    @if ($booking->outstandingCharges() > 0 && $applicable <= 0)
+                        <p class="w-full text-xs text-amber-300">Extra charges exceed the deposit: collect them above, then release the deposit.</p>
+                    @endif
+                </div>
             @endcan
         @endif
     </section>

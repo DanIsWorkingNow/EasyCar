@@ -24,6 +24,9 @@ class BookingResource extends JsonResource
             'total_price' => (float) $this->total_price,
             'addons_amount' => (float) $this->addons_amount,
             'discount_amount' => (float) $this->discount_amount,
+            'points_redeemed' => (int) $this->points_redeemed,
+            'points_discount' => (float) $this->points_discount,
+            'deposit_amount' => (float) $this->deposit_amount,
             'promo_code' => $this->whenLoaded('promoCode', fn () => $this->promoCode?->code),
             'addons' => $this->whenLoaded('addons', fn () => $this->addons->map(fn ($a) => [
                 'id' => $a->addon_id,

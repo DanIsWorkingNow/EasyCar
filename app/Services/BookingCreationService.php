@@ -7,7 +7,10 @@ use App\Models\Booking;
 use App\Models\Car;
 use App\Models\PromoCode;
 use App\Models\User;
+use App\Services\Pricing\LoyaltyService;
+use App\Services\Pricing\PricingService;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -20,10 +23,13 @@ use Illuminate\Validation\ValidationException;
  *  - a customer may hold at most MAX_CARS_PER_PERIOD cars across all of
  *    their active bookings that overlap the range (previously only the
  *    legacy web form enforced this — the Livewire flow and API skipped it);
- *  - prices are computed server-side from price_per_day, never trusted
- *    from the client;
+ *  - prices are computed server-side, never trusted from the client: each
+ *    day is priced from price_per_day plus seasonal/weekend rules, with
+ *    weekly/monthly discounts (App\Services\Pricing\PricingService);
  *  - paid add-ons (child seat, GPS…) and a promo code are priced here too:
- *    total_price = rental + addons_amount − discount_amount.
+ *    total_price = rental + addons_amount − discount_amount − points_discount;
+ *  - EasyCar Rewards points can be redeemed against the rest, and the
+ *    refundable deposit due at pick-up is snapshotted on the booking.
  */
 class BookingCreationService
 {
@@ -32,6 +38,8 @@ class BookingCreationService
     public function __construct(
         private BookingAvailabilityService $availability,
         private PromoCodeService $promos,
+        private PricingService $pricing,
+        private LoyaltyService $loyalty,
     ) {}
 
     /**
@@ -40,13 +48,13 @@ class BookingCreationService
      *
      * @throws ValidationException
      */
-    public function create(User $user, array $carIds, string $startDate, string $endDate, ?string $acceptedFromIp = null, array $addons = [], ?string $promoCode = null): Booking
+    public function create(User $user, array $carIds, string $startDate, string $endDate, ?string $acceptedFromIp = null, array $addons = [], ?string $promoCode = null, bool $usePoints = false): Booking
     {
         $carIds = $this->normaliseIds($carIds);
         $addons = $this->normaliseAddons($addons);
         $promoCode = filled($promoCode) ? (string) $promoCode : null;
 
-        return DB::transaction(function () use ($user, $carIds, $startDate, $endDate, $acceptedFromIp, $addons, $promoCode) {
+        return DB::transaction(function () use ($user, $carIds, $startDate, $endDate, $acceptedFromIp, $addons, $promoCode, $usePoints) {
             // Serialise concurrent submissions for the same cars so two
             // customers can't both pass the availability check.
             Car::whereIn('id', $carIds)->lockForUpdate()->get();
@@ -75,7 +83,13 @@ class BookingCreationService
 
             $promo = $promoCode !== null ? $this->promos->evaluate($promoCode, $user, $rental + $addonsAmount, lock: true) : null;
 
-            $this->applyTotals($booking, $rental, $addonsAmount, $promo);
+            $discount = $promo ? $promo->discountFor($rental + $addonsAmount) : 0.0;
+
+            $points = $usePoints
+                ? $this->loyalty->redeem($user, $booking, round($rental + $addonsAmount - $discount, 2))
+                : ['points' => 0, 'value' => 0.0];
+
+            $this->applyTotals($booking, $rental, $addonsAmount, $promo, $points['points'], $points['value']);
 
             return $booking->load('cars', 'addons');
         });
@@ -121,7 +135,17 @@ class BookingCreationService
                 'end_date' => $endDate,
                 'total_days' => $totalDays,
             ]);
-            $this->applyTotals($booking, $rental, $addonsAmount, $booking->promoCode);
+            $promo = $booking->promoCode;
+            $discount = $promo ? $promo->discountFor($rental + $addonsAmount) : 0.0;
+
+            // Keep redeemed points within the cap for the new price; any
+            // excess goes back to the customer's balance.
+            $redeemed = (int) $booking->points_redeemed;
+            $cap = (int) floor(max(0, $rental + $addonsAmount - $discount) * (float) config('pricing.loyalty.max_redeem_percent') / 100 / $this->loyalty->pointValue() + 1e-9);
+            $keep = min($redeemed, $cap);
+            $this->loyalty->returnPoints($booking, $redeemed - $keep, "Points returned — booking {$booking->reference} re-priced");
+
+            $this->applyTotals($booking, $rental, $addonsAmount, $promo, $keep, $this->loyalty->valueOf($keep));
 
             return $booking->load('cars', 'addons');
         });
@@ -134,16 +158,23 @@ class BookingCreationService
      *
      * @param  int[]  $carIds
      * @param  array<int|string, int|string>  $addons
-     * @return array{days: int, rental: float, addons_total: float, discount: float, total: float, promo: ?PromoCode, promo_error: ?string, lines: array<int, array{car_id: int, name: string, price: float}>, addon_lines: array<int, array{addon_id: int, name: string, quantity: int, price: float}>}
+     * @return array{days: int, rental: float, addons_total: float, discount: float, points: int, points_discount: float, points_available: int, deposit: float, total: float, promo: ?PromoCode, promo_error: ?string, lines: array<int, array{car_id: int, name: string, price: float, base: float, notes: array<int, string>}>, addon_lines: array<int, array{addon_id: int, name: string, quantity: int, price: float}>}
      */
-    public function quote(array $carIds, string $startDate, string $endDate, array $addons = [], ?User $user = null, ?string $promoCode = null): array
+    public function quote(array $carIds, string $startDate, string $endDate, array $addons = [], ?User $user = null, ?string $promoCode = null, bool $usePoints = false): array
     {
         $days = $this->totalDays($startDate, $endDate);
-        $lines = Car::whereIn('id', $this->normaliseIds($carIds))->get()->map(fn (Car $car) => [
-            'car_id' => $car->id,
-            'name' => $car->name,
-            'price' => round((float) $car->price_per_day * $days, 2),
-        ])->values()->all();
+        $cars = Car::whereIn('id', $this->normaliseIds($carIds))->get();
+        $lines = $cars->map(function (Car $car) use ($startDate, $endDate) {
+            $price = $this->pricing->carPrice($car, $startDate, $endDate);
+
+            return [
+                'car_id' => $car->id,
+                'name' => $car->name,
+                'price' => $price['total'],
+                'base' => $price['base'],
+                'notes' => $price['notes'],
+            ];
+        })->values()->all();
 
         $addons = $this->normaliseAddons($addons);
         $addonLines = Addon::whereIn('id', array_keys($addons))->where('is_active', true)->orderBy('sort_order')->get()
@@ -168,13 +199,22 @@ class BookingCreationService
         }
 
         $discount = $promo ? $promo->discountFor($rental + $addonsTotal) : 0.0;
+        $payable = round($rental + $addonsTotal - $discount, 2);
+
+        $available = $user && $lines !== [] ? $this->loyalty->redeemablePoints($user->pointsBalance(), $payable) : 0;
+        $points = $usePoints ? $available : 0;
+        $pointsDiscount = $this->loyalty->valueOf($points);
 
         return [
             'days' => $days,
             'rental' => $rental,
             'addons_total' => $addonsTotal,
             'discount' => $discount,
-            'total' => round($rental + $addonsTotal - $discount, 2),
+            'points' => $points,
+            'points_discount' => $pointsDiscount,
+            'points_available' => $available,
+            'deposit' => $this->depositFor($cars),
+            'total' => round($payable - $pointsDiscount, 2),
             'promo' => $promo,
             'promo_error' => $promoError,
             'lines' => $lines,
@@ -228,7 +268,7 @@ class BookingCreationService
         $total = 0.0;
 
         foreach (Car::whereIn('id', $carIds)->get() as $car) {
-            $price = round((float) $car->price_per_day * $totalDays, 2);
+            $price = $this->pricing->carPrice($car, $startDate, $endDate)['total'];
             $total += $price;
 
             $booking->cars()->attach($car->id, [
@@ -285,7 +325,7 @@ class BookingCreationService
         return round($total, 2);
     }
 
-    private function applyTotals(Booking $booking, float $rental, float $addonsAmount, ?PromoCode $promo): void
+    private function applyTotals(Booking $booking, float $rental, float $addonsAmount, ?PromoCode $promo, int $points = 0, float $pointsValue = 0.0): void
     {
         $discount = $promo ? $promo->discountFor($rental + $addonsAmount) : 0.0;
 
@@ -293,8 +333,17 @@ class BookingCreationService
             'addons_amount' => $addonsAmount,
             'promo_code_id' => $promo?->id,
             'discount_amount' => $discount,
-            'total_price' => round($rental + $addonsAmount - $discount, 2),
+            'points_redeemed' => $points,
+            'points_discount' => $pointsValue,
+            'deposit_amount' => $this->depositFor($booking->cars()->get()),
+            'total_price' => round($rental + $addonsAmount - $discount - $pointsValue, 2),
         ])->save();
+    }
+
+    /** @param Collection<int, Car> $cars */
+    private function depositFor($cars): float
+    {
+        return config('pricing.deposit.required') ? round((float) $cars->sum(fn (Car $car) => $car->depositAmount()), 2) : 0.0;
     }
 
     /**

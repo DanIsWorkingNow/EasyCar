@@ -66,6 +66,7 @@ class BookingController extends Controller
             'addons.*.id' => 'required|integer|exists:addons,id',
             'addons.*.quantity' => 'required|integer|min:1|max:10',
             'promo_code' => 'sometimes|nullable|string|max:40',
+            'use_points' => 'sometimes|boolean',
         ]);
 
         // Availability, the per-customer car limit and pricing all live in
@@ -75,6 +76,7 @@ class BookingController extends Controller
             $request->boolean('accept_terms') ? (string) $request->ip() : null,
             collect($validated['addons'] ?? [])->mapWithKeys(fn ($a) => [(int) $a['id'] => (int) $a['quantity']])->all(),
             $validated['promo_code'] ?? null,
+            $request->boolean('use_points'),
         );
 
         $request->user()->notify(new BookingConfirmed($booking));

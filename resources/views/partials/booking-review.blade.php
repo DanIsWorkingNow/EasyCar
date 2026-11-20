@@ -68,7 +68,7 @@
                                 <tr>
                                     <td class="text-mute">{{ $payment->created_at->format('d M, g:i A') }}</td>
                                     <td class="text-mute">{{ $payment->purposeLabel() }}</td>
-                                    <td>{{ $payment->gatewayLabel() }}@if (($payment->meta['method'] ?? null) && $payment->gateway === 'counter')<span class="block text-xs text-subtle">{{ \App\Payments\Gateways\CounterGateway::METHODS[$payment->meta['method']] ?? '' }}</span>@endif</td>
+                                    <td>{{ $payment->gatewayLabel() }}@if (($payment->meta['method'] ?? null) && $payment->gateway === 'counter')<span class="block text-xs text-subtle">{{ \App\Payments\Gateways\CounterGateway::methodLabel($payment->meta['method']) }}</span>@endif</td>
                                     <td class="font-mono text-xs">@if ($paymentRoute ?? null)<a href="{{ route($paymentRoute, $payment) }}" class="hover:underline">{{ Str::limit($payment->gateway_reference, 22) }}</a>@else{{ Str::limit($payment->gateway_reference, 22) }}@endif</td>
                                     <td><x-payment-badge :status="$payment->status" /></td>
                                     <td class="text-right font-medium">RM {{ number_format($payment->amount, 2) }}
