@@ -7,6 +7,21 @@ Commit hashes refer to `main`.
 
 ## [Unreleased] — 2026-11-20
 
+### SIT — System Integration Testing
+
+### Added
+- SIT environment (`deploy/sit/`, `.env.sit`, `database/sit.sqlite`) with
+  `SitScenarioSeeder`, and a 47-case end-to-end browser pack
+  (`tests/SIT/sit-pack.cjs`) covering storefront, accounts, KYC, booking,
+  payments, approvals, operations and deposits, pricing and rewards,
+  customer experience, consoles, API and email. See `docs/SIT.md`.
+
+### Fixed
+- **DEF-01 (High):** editing a customer in Admin → Users silently promoted
+  them to Staff (the role list had no Customer option). The form now offers
+  Customer, pre-selects the user's actual role, and accepts it.
+- Pricing rules list labels day-of-week rules correctly.
+
 ### Phase 5 — Pricing & revenue
 
 ### Added

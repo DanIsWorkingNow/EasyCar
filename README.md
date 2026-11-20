@@ -115,11 +115,13 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 ## Operations
 
 ```bash
-php artisan test                 # 164 Pest tests
+php artisan test                 # 165 Pest tests
 ./vendor/bin/pint --test         # code style
 ./vendor/bin/phpstan analyse     # Larastan
 npm run build                    # production assets
 ```
+
+**SIT (System Integration Testing):** `deploy/sit/setup.sh` builds an isolated SIT environment (own database, sandbox payments, emails to the log). `node tests/SIT/sit-pack.cjs` then runs 47 end-to-end browser cases across all modules. See [docs/SIT.md](docs/SIT.md).
 
 The scheduler (`php artisan schedule:run` via cron) handles reminders, the weekly report, payment-hold expiry and overdue-return alerts. Queue workers deliver email notifications. `deploy/forge-deploy-script.sh` is a zero-downtime Laravel Forge deploy script.
 

@@ -23,7 +23,7 @@
             <tbody>
                 @forelse ($rules as $rule)
                     <tr>
-                        <td class="font-medium">{{ $rule->name }}<span class="block text-xs text-subtle capitalize">{{ $rule->kind }}</span></td>
+                        <td class="font-medium">{{ $rule->name }}<span class="block text-xs text-subtle">{{ $rule->kind === 'weekend' ? 'Day of week' : 'Season' }}</span></td>
                         <td class="text-sm text-mute">
                             @if ($rule->kind === 'weekend'){{ collect($rule->days_of_week)->map(fn ($d) => \App\Models\PricingRule::DAYS[$d] ?? $d)->implode(', ') }}@endif
                             @if ($rule->starts_on || $rule->ends_on)<span class="block">{{ $rule->starts_on?->format('d M Y') ?? '…' }} – {{ $rule->ends_on?->format('d M Y') ?? '…' }}</span>@endif

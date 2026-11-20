@@ -68,7 +68,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'userLevel' => 'required|integer|in:1,5', // 1 for staff, 5 for admin
+            'userLevel' => 'required|integer|in:0,1,5', // 0 customer, 1 staff, 5 admin
             'branch_id' => 'nullable|exists:branches,id',
         ]);
 
@@ -111,7 +111,7 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
-            'userLevel' => 'required|integer|in:1,5',
+            'userLevel' => 'required|integer|in:0,1,5',
             'branch_id' => 'nullable|exists:branches,id',
         ]);
 

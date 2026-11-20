@@ -1,5 +1,5 @@
 @php($editing = isset($user) && $user->exists)
-<form method="POST" action="{{ $editing ? route('admin.users.update', $user) : route('admin.users.store') }}" class="card max-w-3xl" x-data="{ level: '{{ old('userLevel', $editing ? (int) $user->userLevel : 1) }}' }">
+<form method="POST" action="{{ $editing ? route('admin.users.update', $user) : route('admin.users.store') }}" class="card max-w-3xl" x-data="{ level: '{{ old('userLevel', $editing ? ($user->hasRole('admin') ? 5 : ($user->hasRole('staff') ? 1 : 0)) : 1) }}' }">
     @csrf
     @if ($editing) @method('PUT') @endif
     <div class="card-pad space-y-5">
@@ -11,6 +11,7 @@
             <div>
                 <label class="label" for="userLevel">Role <span class="text-brand">*</span></label>
                 <select id="userLevel" name="userLevel" x-model="level" class="input @error('userLevel') input-error @enderror" required>
+                    <option value="0">Customer — books and rents cars</option>
                     <option value="1">Staff — approve bookings for one branch</option>
                     <option value="5">Admin — full access</option>
                 </select>

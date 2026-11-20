@@ -71,3 +71,27 @@ it('does not write an audit log entry when the role does not change', function (
 
     expect(RoleAuditLog::where('user_id', $staff->id)->count())->toBe(0);
 });
+
+it('keeps a customer a customer when an admin edits their details (SIT DEF-01)', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $admin = User::factory()->create(['userLevel' => 5]);
+    $admin->assignRole('admin');
+    $customer = User::factory()->create(['userLevel' => 0, 'name' => 'Typo Nmae']);
+    $customer->assignRole('customer');
+
+    // The edit form must pre-select "Customer", not Staff.
+    $this->actingAs($admin)->get(route('admin.users.edit', $customer))
+        ->assertOk()
+        ->assertSee("level: '0'", false)
+        ->assertSee('Customer — books and rents cars');
+
+    // Saving the form as rendered (name fix only) keeps the role.
+    $this->put(route('admin.users.update', $customer), [
+        'name' => 'Typo Name', 'email' => $customer->email, 'userLevel' => 0,
+    ])->assertRedirect(route('admin.users.index'));
+
+    $customer->refresh();
+    expect($customer->name)->toBe('Typo Name')
+        ->and($customer->hasRole('customer'))->toBeTrue()
+        ->and($customer->hasRole('staff'))->toBeFalse();
+});
