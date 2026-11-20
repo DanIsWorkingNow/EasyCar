@@ -104,6 +104,7 @@
         <section class="card card-pad">
             <p class="text-sm text-mute">Total</p>
             <p class="display mt-1 text-5xl">RM {{ number_format($booking->total_price, 2) }}</p>
+            @include('partials.price-breakdown')
         </section>
     </aside>
 </div>

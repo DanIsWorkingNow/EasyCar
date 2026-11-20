@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -42,6 +44,23 @@ class Car extends Model
         return $this->belongsToMany(Booking::class, 'car_booking')
             ->withPivot('rental_start', 'rental_end', 'quantity', 'price')
             ->withTimestamps();
+    }
+
+    /** @return HasMany<Review, $this> */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    /**
+     * Adds rating_avg / rating_count (published reviews) to a car query.
+     *
+     * @param  Builder<Car>  $query
+     */
+    public function scopeWithRatings($query): void
+    {
+        $query->withAvg(['reviews as rating_avg' => fn ($q) => $q->where('is_published', true)], 'rating')
+            ->withCount(['reviews as rating_count' => fn ($q) => $q->where('is_published', true)]);
     }
 
     /** @return BelongsTo<Branch, $this> */

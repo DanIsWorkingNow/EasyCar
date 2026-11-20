@@ -6,6 +6,7 @@
         ['label' => 'Browse cars', 'route' => 'cars.index', 'active' => request()->routeIs('cars.*')],
     ];
     if ($user) {
+        $links[] = ['label' => 'My List', 'route' => 'favourites.index', 'active' => request()->routeIs('favourites.*')];
         $links[] = ['label' => 'My bookings', 'route' => 'bookings.index', 'active' => request()->routeIs('bookings.*', 'payments.*')];
     }
 @endphp

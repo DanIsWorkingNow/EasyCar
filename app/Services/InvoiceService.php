@@ -57,7 +57,7 @@ class InvoiceService
      */
     private function linesFor(Payment $payment): array
     {
-        $payment->loadMissing(['booking.cars', 'charges']);
+        $payment->loadMissing(['booking.cars', 'booking.addons', 'booking.promoCode', 'charges']);
         $booking = $payment->booking;
 
         $lines = $payment->isForCharges()
@@ -77,6 +77,26 @@ class InvoiceService
                     'amount' => $price,
                 ];
             })->all();
+
+        if (! $payment->isForCharges()) {
+            foreach ($booking->addons as $addon) {
+                $lines[] = [
+                    'description' => 'Extra — '.$addon->name.($addon->pricing === 'per_day' ? ' ('.$addon->quantity.' × '.$booking->total_days.' days)' : ''),
+                    'quantity' => (float) $addon->quantity * ($addon->pricing === 'per_day' ? $booking->total_days : 1),
+                    'unit_amount' => (float) $addon->unit_price,
+                    'amount' => (float) $addon->amount,
+                ];
+            }
+
+            if ((float) $booking->discount_amount > 0) {
+                $lines[] = [
+                    'description' => 'Discount'.($booking->promoCode ? ' — promo code '.$booking->promoCode->code : ''),
+                    'quantity' => 1,
+                    'unit_amount' => -(float) $booking->discount_amount,
+                    'amount' => -(float) $booking->discount_amount,
+                ];
+            }
+        }
 
         // The invoice must always equal what was actually paid.
         if (abs(array_sum(array_column($lines, 'amount')) - (float) $payment->amount) > 0.009) {

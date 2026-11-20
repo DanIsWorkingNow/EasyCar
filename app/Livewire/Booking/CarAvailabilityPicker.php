@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Booking;
 
+use App\Models\Addon;
 use App\Models\Branch;
 use App\Models\Car;
 use App\Notifications\BookingConfirmed;
@@ -38,6 +39,14 @@ class CarAvailabilityPicker extends Component
 
     public bool $acceptTerms = false;
 
+    /** @var array<int|string, int> addon id => quantity */
+    public array $addons = [];
+
+    /** Typed into the input; becomes $appliedPromo once it validates. */
+    public string $promoInput = '';
+
+    public ?string $appliedPromo = null;
+
     public function mount(?int $preselectedCarId = null): void
     {
         if ($preselectedCarId && Car::whereKey($preselectedCarId)->exists()) {
@@ -53,6 +62,8 @@ class CarAvailabilityPicker extends Component
             'selectedCarIds' => 'required|array|min:1|max:'.BookingCreationService::MAX_CARS_PER_PERIOD,
             'selectedCarIds.*' => 'integer|exists:cars,id',
             'acceptTerms' => 'accepted',
+            'addons' => 'array',
+            'addons.*' => 'integer|min:0|max:10',
         ];
     }
 
@@ -96,6 +107,55 @@ class CarAvailabilityPicker extends Component
         $this->selectedCarIds[] = $carId;
     }
 
+    public function setAddon(int $addonId, int $quantity): void
+    {
+        $addon = Addon::active()->find($addonId);
+        if (! $addon) {
+            return;
+        }
+
+        $quantity = max(0, min($quantity, $addon->max_quantity));
+        if ($quantity === 0) {
+            unset($this->addons[$addonId]);
+        } else {
+            $this->addons[$addonId] = $quantity;
+        }
+    }
+
+    public function applyPromo(BookingCreationService $pricing): void
+    {
+        $this->resetErrorBag('promo_code');
+        $code = strtoupper(trim($this->promoInput));
+
+        if ($code === '') {
+            $this->addError('promo_code', 'Enter a promo code.');
+
+            return;
+        }
+        if (! $this->startDate || ! $this->endDate || ! $this->selectedCarIds) {
+            $this->addError('promo_code', 'Choose your dates and a car first.');
+
+            return;
+        }
+
+        $quote = $pricing->quote($this->selectedCarIds, $this->startDate, $this->endDate, $this->addons, Auth::user(), $code);
+
+        if ($quote['promo_error']) {
+            $this->addError('promo_code', $quote['promo_error']);
+
+            return;
+        }
+
+        $this->appliedPromo = $code;
+        $this->promoInput = '';
+    }
+
+    public function removePromo(): void
+    {
+        $this->appliedPromo = null;
+        $this->resetErrorBag('promo_code');
+    }
+
     public function clearFilters(): void
     {
         $this->reset(['branchId', 'type', 'transmission', 'search']);
@@ -106,11 +166,21 @@ class CarAvailabilityPicker extends Component
         $this->validate();
 
         try {
-            $booking = $service->create(Auth::user(), $this->selectedCarIds, $this->startDate, $this->endDate, (string) request()->ip());
+            $booking = $service->create(
+                Auth::user(), $this->selectedCarIds, $this->startDate, $this->endDate, (string) request()->ip(),
+                $this->addons, $this->appliedPromo,
+            );
         } catch (ValidationException $e) {
-            // A car was taken between page load and submit, or the
-            // customer already holds two cars for these dates.
-            $this->addError('selectedCarIds', collect($e->errors())->flatten()->first());
+            // A car was taken between page load and submit, the customer
+            // already holds two cars for these dates, or the promo code
+            // stopped being valid (e.g. its last redemption was taken).
+            $errors = $e->errors();
+            if (isset($errors['promo_code'])) {
+                $this->appliedPromo = null;
+                $this->addError('promo_code', $errors['promo_code'][0].' It has been removed — review your total and try again.');
+            } else {
+                $this->addError('selectedCarIds', collect($errors)->flatten()->first());
+            }
 
             return;
         }
@@ -145,15 +215,25 @@ class CarAvailabilityPicker extends Component
             $this->addError('selectedCarIds', 'A car you selected is not available for these dates and was removed.');
         }
 
-        return view('livewire.booking.car-availability-picker', [
+        $view = view('livewire.booking.car-availability-picker', [
             'cars' => $cars,
             'unavailableIds' => $unavailableIds,
             'availableCount' => $cars->whereNotIn('id', $unavailableIds)->count(),
             'branches' => Branch::orderBy('name')->get(),
             'selectedCars' => Car::with('branch')->whereIn('id', $this->selectedCarIds)->get(),
-            'quote' => $hasDates && $this->selectedCarIds ? $pricing->quote($this->selectedCarIds, $this->startDate, $this->endDate) : null,
+            'quote' => $quote = $hasDates && $this->selectedCarIds
+                ? $pricing->quote($this->selectedCarIds, $this->startDate, $this->endDate, $this->addons, Auth::user(), $this->appliedPromo)
+                : null,
+            'availableAddons' => Addon::active()->get(),
             'days' => $hasDates ? $pricing->totalDays($this->startDate, $this->endDate) : null,
             'hasDates' => $hasDates,
         ]);
+
+        // A basket change can invalidate an applied code (e.g. min spend).
+        if ($quote && $quote['promo_error'] && $this->appliedPromo) {
+            $this->addError('promo_code', $quote['promo_error']);
+        }
+
+        return $view;
     }
 }

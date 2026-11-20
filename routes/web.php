@@ -1,14 +1,17 @@
 <?php
 
+use App\Http\Controllers\Admin\AddonController as AdminAddonController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\BranchController as AdminBranchController;
 use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Admin\PromoCodeController as AdminPromoCodeController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CarController;
 use App\Http\Controllers\DriverVerificationController;
+use App\Http\Controllers\FavouriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InspectionController;
 use App\Http\Controllers\InvoiceController;
@@ -18,10 +21,12 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Ops\BoardController as OpsBoardController;
 use App\Http\Controllers\Ops\ChargeController as OpsChargeController;
 use App\Http\Controllers\Ops\HandoverController as OpsHandoverController;
+use App\Http\Controllers\Ops\ReviewController as OpsReviewController;
 use App\Http\Controllers\Ops\VerificationController as OpsVerificationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\Staff\BookingController as StaffBookingController;
 use App\Http\Controllers\Staff\CarController as StaffCarController;
 use App\Http\Controllers\Staff\DashboardController as StaffDashboardController;
@@ -74,6 +79,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/{payment}/sandbox', [PaymentController::class, 'sandbox'])->name('payments.sandbox.show');
     Route::post('/payments/{payment}/sandbox', [PaymentController::class, 'completeSandbox'])->name('payments.sandbox.complete');
 
+    Route::get('/my-list', [FavouriteController::class, 'index'])->name('favourites.index');
+    Route::post('/cars/{car}/favourite', [FavouriteController::class, 'toggle'])->middleware('throttle:60,1')->name('favourites.toggle');
+    Route::post('/bookings/{booking}/reviews', [ReviewController::class, 'store'])->middleware('throttle:20,1')->name('reviews.store');
+
     Route::get('/account/verification', [DriverVerificationController::class, 'show'])->name('verification.show');
     Route::post('/account/verification', [DriverVerificationController::class, 'store'])->middleware('throttle:10,1')->name('verification.store');
     Route::get('/verification/{profile}/documents/{document}', [DriverVerificationController::class, 'document'])->name('verification.document');
@@ -107,6 +116,9 @@ Route::middleware(['auth', 'role:admin|staff'])->prefix('ops')->name('ops.')->gr
     Route::get('/verifications', [OpsVerificationController::class, 'index'])->name('verifications.index');
     Route::get('/verifications/{profile}', [OpsVerificationController::class, 'show'])->name('verifications.show');
     Route::put('/verifications/{profile}', [OpsVerificationController::class, 'update'])->name('verifications.update');
+
+    Route::get('/reviews', [OpsReviewController::class, 'index'])->name('reviews.index');
+    Route::patch('/reviews/{review}', [OpsReviewController::class, 'update'])->name('reviews.update');
 });
 
 // ── Admin console ─────────────────────────────────────────────────────
@@ -115,6 +127,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
 
     Route::resource('cars', AdminCarController::class)->names('admin.cars');
     Route::resource('branches', AdminBranchController::class)->except('show')->names('admin.branches');
+    Route::resource('promo-codes', AdminPromoCodeController::class)->except('show')->names('admin.promo-codes');
+    Route::resource('addons', AdminAddonController::class)->except('show')->names('admin.addons');
     Route::resource('users', AdminUserController::class)->names('admin.users');
 
     // Literal booking routes before the {booking} resource routes.

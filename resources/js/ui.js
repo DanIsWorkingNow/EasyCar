@@ -107,6 +107,28 @@ const register = (Alpine) => {
         },
     }));
 
+    // "My List" heart: optimistic toggle, falls back to the <form> POST without JS.
+    Alpine.data('favourite', (url, on) => ({
+        on,
+        busy: false,
+        async toggle() {
+            if (this.busy) return;
+            this.busy = true;
+            const previous = this.on;
+            this.on = !this.on;
+            try {
+                const { data } = await window.axios.post(url, {}, { headers: { Accept: 'application/json' } });
+                this.on = data.favourited;
+                window.dispatchEvent(new CustomEvent('favourite-toggled', { detail: data }));
+            } catch (error) {
+                this.on = previous;
+                if (error.response?.status === 401) window.location.href = '/login';
+            } finally {
+                this.busy = false;
+            }
+        },
+    }));
+
     // Polls a payment's status until it settles, then reloads.
     Alpine.data('paymentPoller', (url) => ({
         tries: 0,

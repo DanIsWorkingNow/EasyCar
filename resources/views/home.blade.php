@@ -27,6 +27,17 @@
             </div>
         @endif
 
+        @foreach ($toReview as $booking)
+            <div class="mb-8 flex flex-col gap-4 rounded-xl bg-gradient-to-r from-amber-400/15 via-amber-400/5 to-transparent p-5 ring-1 ring-amber-400/30 sm:flex-row sm:items-center">
+                <span class="grid size-11 shrink-0 place-items-center rounded-full bg-amber-400/20"><x-icon name="star" solid class="size-5 text-amber-300" /></span>
+                <div class="flex-1">
+                    <p class="font-semibold">How was the {{ $booking->car_names }}?</p>
+                    <p class="text-sm text-white/70">{{ $booking->reference }} · returned {{ $booking->completed_at->diffForHumans() }}. Rate your trip in a few seconds.</p>
+                </div>
+                <a href="{{ route('bookings.show', $booking) }}#reviews" class="btn btn-light">Rate your trip</a>
+            </div>
+        @endforeach
+
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
             @if ($nextTrip)
                 @php($car = $nextTrip->cars->first())
@@ -82,6 +93,10 @@
             </div>
         @endif
     </div>
+
+    @if ($myList->isNotEmpty())
+        <div class="mt-14"><x-car-row title="My List" :cars="$myList" :href="route('favourites.index')" /></div>
+    @endif
 
     @if ($picks->isNotEmpty())
         <div class="mt-14"><x-car-row title="Picked for you" :cars="$picks" :href="route('cars.index')" /></div>

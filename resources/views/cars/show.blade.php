@@ -4,6 +4,20 @@
 @section('description', "Rent the {$car->name} from RM ".number_format($car->price_per_day, 0)." a day at EasyCar {$car->branch?->name}. Explore it in 3D and book online.")
 @if ($car->photo_url) @section('og_image', $car->photo_url) @endif
 
+@push('head')
+    @if ($rating['count'] > 0)
+        <script type="application/ld+json">{!! json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Product',
+            'name' => $car->name,
+            'image' => $car->photo_url,
+            'brand' => ['@type' => 'Brand', 'name' => $car->brand],
+            'offers' => ['@type' => 'Offer', 'priceCurrency' => 'MYR', 'price' => number_format($car->price_per_day, 2, '.', ''), 'availability' => 'https://schema.org/InStock'],
+            'aggregateRating' => ['@type' => 'AggregateRating', 'ratingValue' => $rating['average'], 'reviewCount' => $rating['count'], 'bestRating' => 5, 'worstRating' => 1],
+        ], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
+    @endif
+@endpush
+
 @section('content')
     <div class="relative">
         {{-- Ambient backdrop from the car photo --}}
@@ -51,7 +65,12 @@
                         @endif
                     </div>
                     <h1 class="display mt-4 text-6xl sm:text-7xl">{{ $car->name }}</h1>
-                    <p class="mt-1 text-sm text-mute">{{ $car->year ? $car->year.' · ' : '' }}<span class="font-mono">{{ $car->plate_number }}</span></p>
+                    <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-mute">
+                        <span>{{ $car->year ? $car->year.' · ' : '' }}<span class="font-mono">{{ $car->plate_number }}</span></span>
+                        @if ($rating['count'] > 0)
+                            <a href="#reviews" class="inline-flex items-center gap-1 hover:text-white"><x-icon name="star" solid class="size-4 text-amber-400" /> <span class="font-semibold text-white">{{ number_format($rating['average'], 1) }}</span> · {{ $rating['count'] }} {{ Str::plural('review', $rating['count']) }}</a>
+                        @endif
+                    </p>
 
                     <div class="mt-6 flex items-end gap-2">
                         <span class="display text-5xl text-white">RM {{ number_format($car->price_per_day, 0) }}</span>
@@ -79,7 +98,7 @@
                         @if ($car->status !== 'maintenance')
                             <a href="{{ route('bookings.create', ['car' => $car->id]) }}" class="btn btn-primary btn-lg flex-1"><x-icon name="play" solid class="size-5" /> Book this car</a>
                         @endif
-                        <a href="{{ route('cars.index', ['type' => $car->type]) }}" class="btn btn-outline btn-lg flex-1">Compare {{ \App\Models\Car::pluralType($car->type) }}</a>
+                        <x-favourite-button :car="$car" variant="full" class="flex-1 [&>button]:w-full [&>a]:w-full" />
                     </div>
 
                     <ul class="mt-6 space-y-2.5 text-sm text-mute">
@@ -136,6 +155,49 @@
                 </section>
             </div>
         </div>
+
+        <section id="reviews" class="container-ec mt-16 scroll-mt-28" aria-labelledby="reviews-title">
+            <h2 id="reviews-title" class="text-2xl font-semibold tracking-tight">Reviews from renters</h2>
+            @if ($rating['count'] === 0)
+                <p class="mt-3 text-sm text-mute">No reviews yet. Reviews come only from customers who completed a trip in this car.</p>
+            @else
+                <div class="mt-6 grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+                    <div class="card card-pad self-start">
+                        <p class="display text-6xl">{{ number_format($rating['average'], 1) }}</p>
+                        <x-stars :rating="$rating['average']" class="mt-1" />
+                        <p class="mt-2 text-sm text-mute">{{ $rating['count'] }} verified {{ Str::plural('review', $rating['count']) }}</p>
+                        <dl class="mt-5 space-y-1.5">
+                            @foreach ($rating['distribution'] as $star => $n)
+                                <div class="flex items-center gap-2 text-xs text-mute">
+                                    <dt class="w-3 text-right">{{ $star }}</dt>
+                                    <dd class="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10"><span class="block h-full rounded-full bg-amber-400" style="width: {{ $rating['count'] ? round($n / $rating['count'] * 100) : 0 }}%"></span></dd>
+                                    <dd class="w-6 text-right tabular-nums">{{ $n }}</dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    </div>
+                    <ul class="grid gap-4 sm:grid-cols-2">
+                        @foreach ($reviews as $review)
+                            <li class="card card-pad">
+                                <div class="flex items-center justify-between gap-3">
+                                    <x-stars :rating="$review->rating" />
+                                    <time class="text-xs text-subtle" datetime="{{ $review->created_at->toDateString() }}">{{ $review->created_at->format('M Y') }}</time>
+                                </div>
+                                @if ($review->title)<p class="mt-3 font-semibold">{{ $review->title }}</p>@endif
+                                @if ($review->body)<p class="mt-1.5 text-sm leading-relaxed text-mute">{{ $review->body }}</p>@endif
+                                <p class="mt-3 flex items-center gap-1.5 text-xs text-subtle"><x-icon name="check-circle" class="size-3.5 text-match" /> {{ $review->reviewerName() }} · Verified rental</p>
+                                @if ($review->reply)
+                                    <div class="mt-4 rounded-lg bg-white/[0.04] p-3 text-sm ring-1 ring-line">
+                                        <p class="text-xs font-semibold text-white/80">Reply from EasyCar</p>
+                                        <p class="mt-1 text-mute">{{ $review->reply }}</p>
+                                    </div>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </section>
 
         @if ($similar->isNotEmpty())
             <div class="mt-16">

@@ -62,6 +62,10 @@ class BookingController extends Controller
             'cars' => 'required|array|min:1|max:2',
             'cars.*' => 'integer|exists:cars,id',
             'accept_terms' => 'sometimes|accepted',
+            'addons' => 'sometimes|array',
+            'addons.*.id' => 'required|integer|exists:addons,id',
+            'addons.*.quantity' => 'required|integer|min:1|max:10',
+            'promo_code' => 'sometimes|nullable|string|max:40',
         ]);
 
         // Availability, the per-customer car limit and pricing all live in
@@ -69,18 +73,20 @@ class BookingController extends Controller
         $booking = $bookings->create(
             $request->user(), $validated['cars'], $validated['start_date'], $validated['end_date'],
             $request->boolean('accept_terms') ? (string) $request->ip() : null,
+            collect($validated['addons'] ?? [])->mapWithKeys(fn ($a) => [(int) $a['id'] => (int) $a['quantity']])->all(),
+            $validated['promo_code'] ?? null,
         );
 
         $request->user()->notify(new BookingConfirmed($booking));
 
-        return (new BookingResource($booking))->response()->setStatusCode(201);
+        return (new BookingResource($booking->load('promoCode')))->response()->setStatusCode(201);
     }
 
     public function show(Request $request, Booking $booking)
     {
         $this->authorize('view', $booking);
 
-        return new BookingResource($booking->load(['user', 'cars', 'approvedBy']));
+        return new BookingResource($booking->load(['user', 'cars', 'approvedBy', 'addons', 'promoCode']));
     }
 
     public function update(Request $request, Booking $booking, BookingCreationService $bookings)
@@ -105,7 +111,7 @@ class BookingController extends Controller
             $validated['end_date'],
         );
 
-        return new BookingResource($booking->fresh(['user', 'cars']));
+        return new BookingResource($booking->fresh(['user', 'cars', 'addons', 'promoCode']));
     }
 
     public function destroy(Request $request, Booking $booking)
