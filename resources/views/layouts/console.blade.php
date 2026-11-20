@@ -8,6 +8,9 @@
             ['Bookings', 'admin.bookings.index', 'calendar', 'admin.bookings.*'],
             ['Verifications', 'ops.verifications.index', 'shield', 'ops.verifications.*'],
             ['Payments', 'admin.payments.index', 'card', 'admin.payments.*'],
+            ['Reviews', 'ops.reviews.index', 'star', 'ops.reviews.*'],
+            ['Promotions', 'admin.promo-codes.index', 'tag', 'admin.promo-codes.*'],
+            ['Extras', 'admin.addons.index', 'sparkles', 'admin.addons.*'],
             ['Fleet', 'admin.cars.index', 'cube', 'admin.cars.*'],
             ['Branches', 'admin.branches.index', 'building', 'admin.branches.*'],
             ['Users', 'admin.users.index', 'users', 'admin.users.*'],
@@ -17,6 +20,7 @@
             ['Operations', 'ops.board', 'car', 'ops.board'],
             ['Bookings', 'staff.bookings.index', 'calendar', 'staff.bookings.*'],
             ['Verifications', 'ops.verifications.index', 'shield', 'ops.verifications.*'],
+            ['Reviews', 'ops.reviews.index', 'star', 'ops.reviews.*'],
             ['Branch fleet', 'staff.cars.index', 'cube', 'staff.cars.*'],
         ];
     $pending = \App\Models\Booking::pending()

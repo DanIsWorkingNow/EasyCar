@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Car;
 use App\Services\BookingAvailabilityService;
+use App\Services\ReviewService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -25,7 +26,7 @@ class CarController extends Controller
 
         $filtering = collect($filters)->except('sort')->filter(fn ($v) => filled($v))->isNotEmpty();
 
-        $query = Car::with('branch')
+        $query = Car::with('branch')->withRatings()
             ->search($filters['q'] ?? null)
             ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
             ->when($filters['transmission'] ?? null, fn ($q, $t) => $q->whereRaw('LOWER(transmission) = ?', [strtolower($t)]))
@@ -54,7 +55,7 @@ class CarController extends Controller
         ]);
     }
 
-    public function show(Car $car, BookingAvailabilityService $availability)
+    public function show(Car $car, BookingAvailabilityService $availability, ReviewService $reviewService)
     {
         $car->load('branch');
 
@@ -70,12 +71,15 @@ class CarController extends Controller
             ->unique()
             ->values();
 
-        $similar = Car::with('branch')
+        $rating = $reviewService->summary($car);
+        $reviews = $car->reviews()->published()->with('user')->latest()->limit(12)->get();
+
+        $similar = Car::with('branch')->withRatings()
             ->whereKeyNot($car->id)
             ->where(fn ($q) => $q->where('type', $car->type)->orWhere('branch_id', $car->branch_id))
             ->limit(10)
             ->get();
 
-        return view('cars.show', compact('car', 'bookedDays', 'similar'));
+        return view('cars.show', compact('car', 'bookedDays', 'similar', 'rating', 'reviews'));
     }
 }

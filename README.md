@@ -16,7 +16,8 @@ Built with **Laravel 12**, **Livewire 4**, **Tailwind CSS 4** and **three.js**.
 | **Payments** | Driver-based framework (`app/Payments`) with Stripe Checkout, Billplz and ToyyibPay drivers plus a built-in sandbox. Webhooks are signature-verified and idempotent. Rejected or cancelled paid bookings are refunded automatically. Unpaid holds are released on a schedule. |
 | **Rental operations** | A board per branch showing pickups, returns due, cars on trip, overdue returns and no-shows. A tablet-friendly handover form records mileage, fuel, a checklist, damage on a tap-to-mark car diagram, photos and the customer's signature. Late, fuel and mileage charges are calculated automatically. |
 | **Trust & compliance** | Driver verification (licence + IC/passport, encrypted at rest, private documents) with a staff review queue and enforcement at approval and pick-up; versioned rental-terms acceptance; Terms & PDPA Privacy pages; numbered tax invoices and credit notes as PDF, attached to receipt emails; branded email templates. |
-| **Admin console** | Live KPIs and charts, approval queue, bookings (filters, bulk approve, CSV export), payments (refunds, webhook log), fleet (3D preview, `.glb` upload), branches, and users with audited role changes. |
+| **Customer experience** | "My List" favourites, verified reviews & star ratings (with moderation and public replies), promo codes, and paid extras such as CDW protection, child seats and GPS. |
+| **Admin console** | Live KPIs and charts, approval queue, bookings (filters, bulk approve, CSV export), payments (refunds, webhook log), reviews, promotions, extras, fleet (3D preview, `.glb` upload), branches, and users with audited role changes. |
 | **Staff console** | The same tools, scoped to the staff member's branch. |
 | **API** | Versioned REST API (`/api/v1`) with Sanctum tokens and tiered rate limits. A Postman environment lives in `postman/`. |
 
@@ -88,6 +89,14 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 - **Rental agreement:** the booking flow requires accepting the Terms of Rental. The accepted `COMPLIANCE_TERMS_VERSION`, time and IP are stored on the booking. `/terms` and `/privacy` (PDPA) are templates; have them reviewed before launch.
 - **Invoices:** every settled payment (online, counter, rental or extras) gets an immutable tax invoice numbered `INV-YYYY-NNNNNN`; every refund gets a credit note `CN-YYYY-NNNNNN` referencing it. Seller, buyer and lines are snapshotted at issue time. Prices are tax-inclusive; set `INVOICE_TAX_RATE` to show the tax portion. PDFs (dompdf, ~25 KB) are attached to receipt and refund emails and downloadable from the booking and admin pages.
 
+## Customer experience
+
+- **My List:** customers save cars with the heart on any tile or car page; saved cars appear at `/my-list` and as a row on the storefront and home page.
+- **Reviews:** only customers with a completed booking can review a car, once per car per booking, within `REVIEWS_WINDOW_DAYS` (default 90) of completion. Staff reply or hide reviews in **Operations → Reviews**. Car pages output schema.org `AggregateRating` for search results.
+- **Promo codes** (**Admin → Promotions**): percent or fixed, with optional cap, minimum spend, validity window, total and per-customer limits, and first-booking-only. A redemption is any booking using the code that isn't cancelled or rejected, so cancelling frees it up. Seeded demo codes: `WELCOME10`, `WEEKEND20`.
+- **Extras** (**Admin → Extras**): priced per day or per trip, with a max quantity. Prices are snapshotted on each booking, so changes apply only to new bookings.
+- The booking total is `rental + extras − discount`. Invoices itemise extras and show the discount as a negative line. The API accepts `addons: [{id, quantity}]` and `promo_code` on `POST /api/v1/bookings`.
+
 ## 3D models
 
 - The default model is generated from extruded side profiles in `resources/js/car-viewer/procedural-car.js`, with paint taken from the car's **Paint colour** field.
@@ -97,7 +106,7 @@ The trip lifecycle is **approved → picked up (on trip) → returned → comple
 ## Operations
 
 ```bash
-php artisan test                 # 126 Pest tests
+php artisan test                 # 149 Pest tests
 ./vendor/bin/pint --test         # code style
 ./vendor/bin/phpstan analyse     # Larastan
 npm run build                    # production assets

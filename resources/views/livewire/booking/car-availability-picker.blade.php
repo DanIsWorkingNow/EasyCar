@@ -141,11 +141,65 @@
                     @endforelse
                 </ul>
 
+                @if ($availableAddons->isNotEmpty())
+                    <div class="divider pt-4">
+                        <p class="text-[11px] font-semibold tracking-wider text-subtle uppercase">Extras</p>
+                        <ul class="mt-3 space-y-2.5">
+                            @foreach ($availableAddons as $addon)
+                                @php $qty = (int) ($addons[$addon->id] ?? 0); @endphp
+                                <li class="flex items-center gap-3" wire:key="addon-{{ $addon->id }}">
+                                    <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[0.04] ring-1 ring-line"><x-icon :name="$addon->icon" class="size-4 text-mute" /></span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-sm font-medium">{{ $addon->name }}</p>
+                                        <p class="text-xs text-subtle">{{ $addon->priceLabel() }}</p>
+                                    </div>
+                                    @if ($addon->max_quantity > 1)
+                                        <div class="flex items-center gap-1" role="group" aria-label="{{ $addon->name }} quantity">
+                                            <button type="button" wire:click="setAddon({{ $addon->id }}, {{ $qty - 1 }})" class="grid size-7 place-items-center rounded-md ring-1 ring-line hover:bg-white/5 disabled:opacity-30" @disabled($qty === 0) aria-label="Fewer {{ $addon->name }}"><x-icon name="minus" class="size-3.5" /></button>
+                                            <span class="w-5 text-center text-sm tabular-nums" aria-live="polite">{{ $qty }}</span>
+                                            <button type="button" wire:click="setAddon({{ $addon->id }}, {{ $qty + 1 }})" class="grid size-7 place-items-center rounded-md ring-1 ring-line hover:bg-white/5 disabled:opacity-30" @disabled($qty >= $addon->max_quantity) aria-label="More {{ $addon->name }}"><x-icon name="plus" class="size-3.5" /></button>
+                                        </div>
+                                    @else
+                                        <button type="button" wire:click="setAddon({{ $addon->id }}, {{ $qty ? 0 : 1 }})" role="switch" aria-checked="{{ $qty ? 'true' : 'false' }}" aria-label="{{ $addon->name }}"
+                                                class="relative h-6 w-11 shrink-0 rounded-full transition {{ $qty ? 'bg-brand' : 'bg-white/10' }}">
+                                            <span class="absolute top-0.5 size-5 rounded-full bg-white shadow transition-all {{ $qty ? 'left-[22px]' : 'left-0.5' }}"></span>
+                                        </button>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                <div class="divider pt-4">
+                    @if ($appliedPromo)
+                        <div class="flex items-center justify-between rounded-lg bg-emerald-500/10 px-3 py-2 text-sm ring-1 ring-emerald-500/30">
+                            <span class="flex items-center gap-2 text-emerald-300"><x-icon name="tag" class="size-4" /> <span class="font-semibold tracking-wide">{{ $appliedPromo }}</span> {{ $quote['promo']?->label() }}</span>
+                            <button type="button" wire:click="removePromo" class="text-xs text-subtle hover:text-white">Remove</button>
+                        </div>
+                    @else
+                        <form wire:submit="applyPromo" class="flex gap-2">
+                            <label for="promo" class="sr-only">Promo code</label>
+                            <input id="promo" type="text" wire:model="promoInput" placeholder="Promo code" autocomplete="off" class="input h-10 flex-1 uppercase placeholder:normal-case">
+                            <button type="submit" class="btn btn-light h-10 px-4" wire:loading.attr="disabled" wire:target="applyPromo">Apply</button>
+                        </form>
+                    @endif
+                    @error('promo_code')
+                        <p class="mt-2 text-xs text-red-300" role="alert">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 <div class="divider pt-4">
                     @if ($quote)
                         @foreach ($quote['lines'] as $line)
                             <div class="flex justify-between text-sm text-mute"><span>{{ $line['name'] }}</span><span>RM {{ number_format($line['price'], 2) }}</span></div>
                         @endforeach
+                        @foreach ($quote['addon_lines'] as $line)
+                            <div class="flex justify-between text-sm text-mute"><span>{{ $line['name'] }}@if ($line['quantity'] > 1) × {{ $line['quantity'] }}@endif</span><span>RM {{ number_format($line['price'], 2) }}</span></div>
+                        @endforeach
+                        @if ($quote['discount'] > 0)
+                            <div class="flex justify-between text-sm text-emerald-300"><span>Discount ({{ $quote['promo']->code }})</span><span>− RM {{ number_format($quote['discount'], 2) }}</span></div>
+                        @endif
                     @endif
                     <div class="mt-3 flex items-end justify-between">
                         <span class="text-sm text-mute">Total</span>

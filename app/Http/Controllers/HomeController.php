@@ -35,7 +35,11 @@ class HomeController extends Controller
             'awaitingPayment' => $upcoming->filter(fn (Booking $b) => $b->canBePaid())->values(),
             'tripCount' => $bookings->whereIn('status', ['approved', 'completed'])->count(),
             'notifications' => $user->notifications()->latest()->limit(5)->get(),
-            'picks' => Car::with('branch')->inRandomOrder()->limit(10)->get(),
+            'picks' => Car::with('branch')->withRatings()->inRandomOrder()->limit(10)->get(),
+            'myList' => $user->favourites()->with('branch')->withRatings()->orderByPivot('created_at', 'desc')->limit(12)->get(),
+            'toReview' => $bookings->filter(fn (Booking $b) => $b->status === 'completed'
+                && $b->completed_at?->gte(now()->subDays((int) config('reviews.window_days')))
+                && $b->reviews()->count() < $b->cars->count())->values(),
         ]);
     }
 }

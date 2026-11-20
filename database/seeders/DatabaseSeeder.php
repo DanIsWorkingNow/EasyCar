@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             CarSeeder::class,
             UserSeeder::class,
             RolesAndPermissionsSeeder::class,
+            CustomerExperienceSeeder::class,
         ]);
     }
 }

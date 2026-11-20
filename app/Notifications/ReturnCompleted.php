@@ -43,6 +43,13 @@ class ReturnCompleted extends Notification implements ShouldQueue
             $mail->line('Total: RM '.number_format($this->charges->sum('amount'), 2).'. You can pay online from your booking page.');
         }
 
+        // Once every car is back the booking is completed — invite a review.
+        if ($i->booking->fresh()?->status === 'completed') {
+            $mail->line('How was your trip? Rating the car takes a few seconds and helps other renters.');
+
+            return $mail->action('Rate your trip', route('bookings.show', $i->booking).'#reviews');
+        }
+
         return $mail->action('View booking', route('bookings.show', $i->booking));
     }
 

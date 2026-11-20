@@ -6,6 +6,7 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -63,6 +64,22 @@ class User extends Authenticatable
     }
 
     /** @return BelongsTo<Branch, $this> */
+    /** @return BelongsToMany<Car, $this> */
+    public function favourites(): BelongsToMany
+    {
+        return $this->belongsToMany(Car::class, 'favourites')->withTimestamps();
+    }
+
+    /**
+     * Favourite car ids, memoised for the request (every car tile asks).
+     *
+     * @return array<int, int>
+     */
+    public function favouriteCarIds(): array
+    {
+        return once(fn () => $this->favourites()->pluck('cars.id')->map(fn ($id) => (int) $id)->all());
+    }
+
     /** @return HasOne<DriverProfile, $this> */
     public function driverProfile(): HasOne
     {

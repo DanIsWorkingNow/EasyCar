@@ -166,6 +166,8 @@
                         </div>
                     </section>
                 @endif
+
+                @include('bookings.partials.reviews')
             </div>
 
             {{-- Summary + pay --}}
@@ -174,6 +176,7 @@
                     <div class="border-b border-line p-6">
                         <p class="text-sm text-mute">Total</p>
                         <p class="display mt-1 text-5xl">RM {{ number_format($booking->total_price, 2) }}</p>
+                        @include('partials.price-breakdown')
                         <div class="mt-3 flex items-center gap-2">
                             <x-payment-badge :status="$booking->payment_status" />
                             @if ($booking->isPaid() && ($paid = $booking->payments->where('purpose', 'booking')->firstWhere('status', \App\Enums\PaymentStatus::Paid)))

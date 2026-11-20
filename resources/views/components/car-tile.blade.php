@@ -21,11 +21,10 @@
                 @if ($car->status === 'maintenance')
                     <span class="badge badge-warning">In service</span>
                 @endif
-            </div>
-
-            <span class="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/80 opacity-0 backdrop-blur transition group-hover/tile:opacity-100">
+                <span class="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white/80 opacity-0 backdrop-blur transition group-hover/tile:opacity-100">
                     <x-icon name="cube" class="size-3" /> 3D
                 </span>
+            </div>
 
             <div class="absolute inset-x-0 bottom-0 p-3.5">
                 <h3 class="display truncate text-[1.65rem] text-white">{{ $car->name }}</h3>
@@ -35,6 +34,10 @@
                     <span>{{ $car->type }}</span>
                     <span class="text-white/30">•</span>
                     <span class="capitalize">{{ strtolower($car->transmission) }}</span>
+                    @if ((int) $car->getAttribute('rating_count') > 0)
+                        <span class="text-white/30">•</span>
+                        <span class="inline-flex items-center gap-0.5" title="{{ $car->getAttribute('rating_count') }} {{ Str::plural('review', (int) $car->getAttribute('rating_count')) }}"><x-icon name="star" solid class="size-3 text-amber-400" />{{ number_format((float) $car->getAttribute('rating_avg'), 1) }}</span>
+                    @endif
                 </div>
 
                 <div class="grid grid-rows-[0fr] opacity-0 transition-all duration-300 group-hover/tile:grid-rows-[1fr] group-hover/tile:opacity-100 group-focus-visible/tile:grid-rows-[1fr] group-focus-visible/tile:opacity-100">
@@ -49,4 +52,5 @@
             </div>
         </div>
     </a>
+    <x-favourite-button :car="$car" class="absolute top-2 right-2 z-20 transition sm:opacity-0 sm:group-hover/tile:opacity-100 sm:focus-within:opacity-100 {{ auth()->check() && in_array($car->id, auth()->user()->favouriteCarIds(), true) ? '!opacity-100' : '' }}" />
 </div>

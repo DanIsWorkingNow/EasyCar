@@ -7,6 +7,36 @@ Commit hashes refer to `main`.
 
 ## [Unreleased] — 2026-11-20
 
+### Phase 4 — Customer experience
+
+### Added
+- **My List:** save cars with a heart on any tile or car page (optimistic
+  toggle, no-JS form fallback), a `/my-list` page, and "My List" rows on the
+  storefront and customer home.
+- **Verified reviews & ratings:** customers rate each car on a completed
+  booking (within 90 days, editable). Car pages show the average, a 5→1
+  distribution, reviews with first name + initial, staff replies, and
+  schema.org `AggregateRating` JSON-LD. Tiles show the ★ average; the
+  storefront gains a "Top rated by renters" row. Customers are prompted from
+  home and the return email. **Operations → Reviews** lets admins (all) and
+  staff (own branch) reply publicly and hide/publish.
+- **Promo codes:** percentage (optional cap) or fixed discounts with minimum
+  spend, start/end, total and per-customer limits and first-booking-only.
+  Applied in the booking flow (live validation) and API (`promo_code`).
+  Admin **Promotions** page shows redemptions and discount given; used codes
+  are deactivated instead of deleted.
+- **Paid extras:** CDW protection, child seat, GPS and additional driver are
+  seeded; per-day or per-trip pricing with max quantities. Chosen in the
+  booking flow (toggles/steppers) or via the API (`addons: [{id, quantity}]`),
+  snapshotted on the booking. Admin **Extras** page.
+- `bookings.addons_amount`, `discount_amount`, `promo_code_id`; booking pages
+  show the price breakdown, invoices add extras lines and a discount line,
+  `BookingResource` exposes the new fields.
+
+### Changed
+- Editing a booking re-prices per-day extras and recomputes an applied
+  promo discount for the new subtotal.
+
 ### Phase 3 — Trust & compliance
 See `docs/ROADMAP.md` for the full 10-phase plan this belongs to.
 

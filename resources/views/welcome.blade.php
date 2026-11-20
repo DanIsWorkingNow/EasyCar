@@ -53,7 +53,7 @@
     {{-- ── Rows ──────────────────────────────────────────────────── --}}
     <div class="relative z-10 {{ $featured ? '-mt-28 sm:-mt-36' : 'pt-28' }} space-y-10 sm:space-y-12">
         @forelse ($rows as $row)
-            <x-car-row :title="$row['title']" :cars="$row['cars']" :ranked="$row['ranked'] ?? false" :href="route('cars.index')" />
+            <x-car-row :title="$row['title']" :cars="$row['cars']" :ranked="$row['ranked'] ?? false" :href="$row['href'] ?? route('cars.index')" />
         @empty
             <div class="container-ec"><x-empty-state title="The showroom is being prepared" description="New cars are on their way. Check back soon." /></div>
         @endforelse

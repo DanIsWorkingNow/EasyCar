@@ -74,6 +74,9 @@ class Booking extends Model
         'terms_version',
         'terms_accepted_at',
         'terms_accepted_ip',
+        'promo_code_id',
+        'discount_amount',
+        'addons_amount',
     ];
 
     protected $attributes = [
@@ -91,6 +94,8 @@ class Booking extends Model
         'overdue_notified_at' => 'datetime',
         'terms_accepted_at' => 'datetime',
         'total_price' => 'float',
+        'discount_amount' => 'float',
+        'addons_amount' => 'float',
         'payment_status' => BookingPaymentStatus::class,
     ];
 
@@ -162,6 +167,30 @@ class Booking extends Model
     public function inspections(): HasMany
     {
         return $this->hasMany(VehicleInspection::class);
+    }
+
+    /** @return HasMany<BookingAddon, $this> */
+    public function addons(): HasMany
+    {
+        return $this->hasMany(BookingAddon::class);
+    }
+
+    /** @return BelongsTo<PromoCode, $this> */
+    public function promoCode(): BelongsTo
+    {
+        return $this->belongsTo(PromoCode::class);
+    }
+
+    /** @return HasMany<Review, $this> */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    /** Car hire only, before add-ons and discount. */
+    public function rentalAmount(): float
+    {
+        return round((float) $this->total_price - (float) $this->addons_amount + (float) $this->discount_amount, 2);
     }
 
     /** @return HasMany<BookingCharge, $this> */
