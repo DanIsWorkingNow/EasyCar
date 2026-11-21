@@ -27,6 +27,14 @@ beforeEach(function () {
     Storage::fake('public');
     Notification::fake();
 
+    // These tests travel into the future with at(), which makes Livewire's
+    // "delete temporary uploads older than a day" sweep (run on every
+    // _finishUpload) delete the files a test has only just uploaded.
+    // Livewire >= 4.4.9 no longer falls back to the file extension when
+    // guessing a missing upload's MIME type, so the deletion now fails
+    // `image` validation instead of passing by accident.
+    config(['livewire.temporary_file_upload.cleanup' => false]);
+
     $this->branch = Branch::factory()->create();
     $this->car = Car::factory()->create(['branch_id' => $this->branch->id, 'price_per_day' => 100]);
     $this->staff = branchStaff($this->branch);
