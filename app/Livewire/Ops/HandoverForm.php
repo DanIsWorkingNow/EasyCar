@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Car;
 use App\Models\VehicleInspection;
 use App\Payments\Gateways\CounterGateway;
+use App\Services\Pricing\DepositService;
 use App\Services\Rentals\HandoverData;
 use App\Services\Rentals\RentalOperationsService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -28,6 +29,7 @@ use Livewire\WithFileUploads;
  * @property-read VehicleInspection|null $pickup
  * @property-read string|null $blocker
  * @property-read bool $paymentRequired
+ * @property-read bool $depositDue
  * @property-read array<int, array{type: ChargeType, description: string, quantity: float, unit_amount: float, amount: float}> $quote
  */
 class HandoverForm extends Component
@@ -66,6 +68,10 @@ class HandoverForm extends Component
     public string $paymentMethod = '';
 
     public string $paymentReference = '';
+
+    public string $depositMethod = '';
+
+    public string $depositReference = '';
 
     public bool $needsMaintenance = false;
 
@@ -127,6 +133,12 @@ class HandoverForm extends Component
     public function paymentRequired(): bool
     {
         return ! $this->isReturn() && app(RentalOperationsService::class)->requiresPaymentAtPickup($this->booking);
+    }
+
+    #[Computed]
+    public function depositDue(): bool
+    {
+        return ! $this->isReturn() && app(DepositService::class)->isDue($this->booking);
     }
 
     /** @return array<int, array{type: ChargeType, description: string, quantity: float, unit_amount: float, amount: float}> */
@@ -197,6 +209,8 @@ class HandoverForm extends Component
             'licenceChecked' => $this->isReturn() ? 'boolean' : 'accepted',
             'paymentMethod' => [Rule::requiredIf(fn () => $this->paymentRequired), 'nullable', Rule::in(array_keys(CounterGateway::METHODS))],
             'paymentReference' => 'nullable|string|max:100',
+            'depositMethod' => [Rule::requiredIf(fn () => $this->depositDue), 'nullable', Rule::in(array_keys(config('pricing.deposit.methods')))],
+            'depositReference' => 'nullable|string|max:100',
             'extraCharges' => 'array|max:10',
             'extraCharges.*.type' => ['required', Rule::in(array_keys(ChargeType::manualOptions()))],
             'extraCharges.*.description' => 'required|string|max:200',
@@ -211,6 +225,7 @@ class HandoverForm extends Component
             'signature.starts_with' => 'The signature could not be read. Please sign again.',
             'licenceChecked.accepted' => 'Confirm you have checked the customer’s driving licence and IC/passport.',
             'paymentMethod.required' => 'Choose how the customer paid at the counter.',
+            'depositMethod.required' => 'Record how the security deposit was taken.',
             'photos.*.image' => 'Photos must be images.',
             'photos.*.max' => 'Each photo must be under '.round(config('rentals.photos.max_kb', 8192) / 1024).' MB.',
         ];
@@ -240,6 +255,7 @@ class HandoverForm extends Component
             signature: $this->signature,
             signedByName: $this->signedByName,
             counterPayment: $this->paymentRequired ? ['method' => $this->paymentMethod, 'reference' => $this->paymentReference ?: null] : null,
+            deposit: $this->depositDue ? ['method' => $this->depositMethod, 'reference' => $this->depositReference ?: null] : null,
         );
 
         $inspection = $this->isReturn()

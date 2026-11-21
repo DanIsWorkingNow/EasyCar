@@ -25,6 +25,12 @@ class CounterGateway implements PaymentGateway
         'bank_transfer' => 'Bank transfer / DuitNow',
     ];
 
+    /** Also covers 'deposit' (extra charges taken from the security deposit). */
+    public static function methodLabel(?string $method): string
+    {
+        return self::METHODS[$method ?? ''] ?? ($method === 'deposit' ? 'From security deposit' : '');
+    }
+
     public function name(): string
     {
         return 'counter';

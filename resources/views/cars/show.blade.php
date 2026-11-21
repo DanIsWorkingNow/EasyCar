@@ -76,6 +76,14 @@
                         <span class="display text-5xl text-white">RM {{ number_format($car->price_per_day, 0) }}</span>
                         <span class="pb-1.5 text-sm text-subtle">per day · taxes included</span>
                     </div>
+                    @if ($discounts = collect(config('pricing.duration_discounts'))->sortKeys())
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach ($discounts as $days => $percent)
+                                <span class="badge badge-success">{{ $days >= 28 ? 'Monthly' : 'Weekly' }} rate · {{ rtrim(rtrim(number_format($percent, 2), '0'), '.') }}% off {{ $days }}+ days</span>
+                            @endforeach
+                        </div>
+                    @endif
+                    <p class="mt-2 text-xs text-subtle">Rates can vary on weekends and holidays — your exact price is shown before you book.{{ config('pricing.deposit.required') ? ' Refundable deposit RM '.number_format($car->depositAmount(), 0).' at pick-up.' : '' }}</p>
 
                     <dl class="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-line ring-1 ring-line">
                         @foreach ([

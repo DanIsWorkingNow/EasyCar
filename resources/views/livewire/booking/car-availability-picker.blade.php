@@ -132,7 +132,11 @@
                             <div class="h-12 w-20 shrink-0 overflow-hidden rounded bg-ink-700"><x-car-photo :car="$car" /></div>
                             <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-semibold">{{ $car->name }}</p>
-                                <p class="text-xs text-subtle">RM {{ number_format($car->price_per_day, 0) }} × {{ $days ?? '—' }} {{ Str::plural('day', $days ?? 2) }}</p>
+                                @php $line = $quote ? collect($quote['lines'])->firstWhere('car_id', $car->id) : null; @endphp
+                                <p class="text-xs text-subtle">RM {{ number_format($car->price_per_day, 0) }}/day × {{ $days ?? '—' }} {{ Str::plural('day', $days ?? 2) }}</p>
+                                @foreach ($line['notes'] ?? [] as $note)
+                                    <p class="text-[11px] {{ str_contains($note, '−') ? 'text-emerald-300' : 'text-amber-300/90' }}">{{ $note }}</p>
+                                @endforeach
                             </div>
                             <button type="button" wire:click="toggleCar({{ $car->id }})" class="rounded p-1 text-subtle hover:text-white" aria-label="Remove {{ $car->name }}"><x-icon name="x" class="size-4" /></button>
                         </li>
@@ -187,6 +191,17 @@
                     @error('promo_code')
                         <p class="mt-2 text-xs text-red-300" role="alert">{{ $message }}</p>
                     @enderror
+
+                    @if ($quote && ($quote['points_available'] > 0 || $usePoints))
+                        <label class="mt-3 flex items-center gap-3 rounded-lg bg-amber-400/[0.07] px-3 py-2.5 text-sm ring-1 ring-amber-400/25">
+                            <input type="checkbox" wire:model.live="usePoints" class="checkbox">
+                            <span class="flex-1">Use <span class="font-semibold">{{ number_format($quote['points_available']) }}</span> Rewards points</span>
+                            <span class="font-semibold text-amber-300">− RM {{ number_format(app(\App\Services\Pricing\LoyaltyService::class)->valueOf($quote['points_available']), 2) }}</span>
+                        </label>
+                    @endif
+                    @error('points')
+                        <p class="mt-2 text-xs text-red-300" role="alert">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div class="divider pt-4">
@@ -200,12 +215,22 @@
                         @if ($quote['discount'] > 0)
                             <div class="flex justify-between text-sm text-emerald-300"><span>Discount ({{ $quote['promo']->code }})</span><span>− RM {{ number_format($quote['discount'], 2) }}</span></div>
                         @endif
+                        @if ($quote['points'] > 0)
+                            <div class="flex justify-between text-sm text-emerald-300"><span>Rewards ({{ number_format($quote['points']) }} pts)</span><span>− RM {{ number_format($quote['points_discount'], 2) }}</span></div>
+                        @endif
                     @endif
                     <div class="mt-3 flex items-end justify-between">
                         <span class="text-sm text-mute">Total</span>
                         <span class="display text-4xl">RM {{ number_format($quote['total'] ?? 0, 2) }}</span>
                     </div>
                 </div>
+
+                @if ($quote && $quote['deposit'] > 0)
+                    <p class="flex items-start gap-2 rounded-lg bg-sky-500/10 px-3 py-2.5 text-xs leading-relaxed text-sky-200 ring-1 ring-sky-500/25">
+                        <x-icon name="shield" class="size-4 shrink-0" />
+                        <span>Refundable security deposit of <span class="font-semibold">RM {{ number_format($quote['deposit'], 2) }}</span> taken at pick-up (card hold, cash or transfer) and released after the return.</span>
+                    </p>
+                @endif
 
                 <label class="flex items-start gap-3 text-sm text-mute">
                     <input type="checkbox" wire:model="acceptTerms" class="checkbox mt-0.5">

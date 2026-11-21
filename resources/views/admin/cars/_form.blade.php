@@ -22,8 +22,11 @@
 
         <section class="card card-pad space-y-5">
             <h2 class="font-semibold">Pricing &amp; operations</h2>
-            <div class="grid gap-4 sm:grid-cols-3">
-                <x-field name="price_per_day" label="Price per day (RM)" type="number" step="0.01" min="1" :value="$car->price_per_day" required />
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-field name="price_per_day" label="Base price per day (RM)" type="number" step="0.01" min="1" :value="$car->price_per_day" required help="Seasonal and weekend rules in Admin → Pricing adjust this per day." />
+                <x-field name="deposit_amount" label="Security deposit (RM)" type="number" step="0.01" min="0" :value="$car->deposit_amount" help="Blank = RM {{ number_format(config('pricing.deposit.by_type.'.($car->type ?? '')) ?? config('pricing.deposit.default'), 0) }} default for this type." />
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
                 <x-field name="plate_number" label="Plate number" :value="$car->plate_number" required placeholder="WXY 1234" class="[&_.input]:font-mono [&_.input]:uppercase" />
                 <x-field name="branch_id" label="Branch" type="select" :value="$car->branch_id" :options="$branches->pluck('name', 'id')->all()" placeholder="Choose branch" required />
             </div>

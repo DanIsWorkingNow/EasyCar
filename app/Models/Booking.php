@@ -8,6 +8,7 @@ use App\Notifications\BookingStatusChanged;
 use App\Services\BookingAvailabilityService;
 use App\Services\DashboardService;
 use App\Services\PaymentService;
+use App\Services\Pricing\LoyaltyService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -77,6 +78,9 @@ class Booking extends Model
         'promo_code_id',
         'discount_amount',
         'addons_amount',
+        'points_redeemed',
+        'points_discount',
+        'deposit_amount',
     ];
 
     protected $attributes = [
@@ -96,11 +100,27 @@ class Booking extends Model
         'total_price' => 'float',
         'discount_amount' => 'float',
         'addons_amount' => 'float',
+        'points_redeemed' => 'integer',
+        'points_discount' => 'float',
+        'deposit_amount' => 'float',
         'payment_status' => BookingPaymentStatus::class,
     ];
 
     protected static function booted(): void
     {
+        // Rewards follow the booking's status, whichever path changed it
+        // (staff, customer, the unpaid-hold expiry job or the API).
+        static::updated(function (Booking $booking) {
+            if (! $booking->wasChanged('status')) {
+                return;
+            }
+            if ($booking->status === 'completed') {
+                app(LoyaltyService::class)->earnFor($booking);
+            } elseif (in_array($booking->status, self::RELEASED_STATUSES, true)) {
+                app(LoyaltyService::class)->reverseRedemption($booking);
+            }
+        });
+
         static::creating(function (Booking $booking) {
             $booking->reference ??= static::generateReference();
         });
@@ -187,10 +207,22 @@ class Booking extends Model
         return $this->hasMany(Review::class);
     }
 
-    /** Car hire only, before add-ons and discount. */
+    /** Car hire only, before add-ons, promo discount and points. */
     public function rentalAmount(): float
     {
-        return round((float) $this->total_price - (float) $this->addons_amount + (float) $this->discount_amount, 2);
+        return round((float) $this->total_price - (float) $this->addons_amount + (float) $this->discount_amount + (float) $this->points_discount, 2);
+    }
+
+    /** @return HasOne<BookingDeposit, $this> */
+    public function deposit(): HasOne
+    {
+        return $this->hasOne(BookingDeposit::class);
+    }
+
+    /** @return HasMany<LoyaltyTransaction, $this> */
+    public function loyaltyTransactions(): HasMany
+    {
+        return $this->hasMany(LoyaltyTransaction::class);
     }
 
     /** @return HasMany<BookingCharge, $this> */

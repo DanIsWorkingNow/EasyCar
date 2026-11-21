@@ -47,6 +47,8 @@ class CarAvailabilityPicker extends Component
 
     public ?string $appliedPromo = null;
 
+    public bool $usePoints = false;
+
     public function mount(?int $preselectedCarId = null): void
     {
         if ($preselectedCarId && Car::whereKey($preselectedCarId)->exists()) {
@@ -168,14 +170,17 @@ class CarAvailabilityPicker extends Component
         try {
             $booking = $service->create(
                 Auth::user(), $this->selectedCarIds, $this->startDate, $this->endDate, (string) request()->ip(),
-                $this->addons, $this->appliedPromo,
+                $this->addons, $this->appliedPromo, $this->usePoints,
             );
         } catch (ValidationException $e) {
             // A car was taken between page load and submit, the customer
             // already holds two cars for these dates, or the promo code
             // stopped being valid (e.g. its last redemption was taken).
             $errors = $e->errors();
-            if (isset($errors['promo_code'])) {
+            if (isset($errors['points'])) {
+                $this->usePoints = false;
+                $this->addError('points', $errors['points'][0]);
+            } elseif (isset($errors['promo_code'])) {
                 $this->appliedPromo = null;
                 $this->addError('promo_code', $errors['promo_code'][0].' It has been removed — review your total and try again.');
             } else {
@@ -222,7 +227,7 @@ class CarAvailabilityPicker extends Component
             'branches' => Branch::orderBy('name')->get(),
             'selectedCars' => Car::with('branch')->whereIn('id', $this->selectedCarIds)->get(),
             'quote' => $quote = $hasDates && $this->selectedCarIds
-                ? $pricing->quote($this->selectedCarIds, $this->startDate, $this->endDate, $this->addons, Auth::user(), $this->appliedPromo)
+                ? $pricing->quote($this->selectedCarIds, $this->startDate, $this->endDate, $this->addons, Auth::user(), $this->appliedPromo, $this->usePoints)
                 : null,
             'availableAddons' => Addon::active()->get(),
             'days' => $hasDates ? $pricing->totalDays($this->startDate, $this->endDate) : null,

@@ -26,7 +26,7 @@ class Car extends Model
 
     protected $fillable = [
         'brand', 'model', 'year', 'type', 'transmission', 'seats', 'fuel_type',
-        'color', 'description', 'branch_id', 'price_per_day', 'photo', 'model_3d',
+        'color', 'description', 'branch_id', 'price_per_day', 'deposit_amount', 'photo', 'model_3d',
         'is_featured', 'status', 'plate_number',
     ];
 
@@ -44,6 +44,12 @@ class Car extends Model
         return $this->belongsToMany(Booking::class, 'car_booking')
             ->withPivot('rental_start', 'rental_end', 'quantity', 'price')
             ->withTimestamps();
+    }
+
+    /** Refundable security deposit for this car (own value, else by type, else default). */
+    public function depositAmount(): float
+    {
+        return round((float) ($this->deposit_amount ?? config('pricing.deposit.by_type.'.$this->type) ?? config('pricing.deposit.default')), 2);
     }
 
     /** @return HasMany<Review, $this> */

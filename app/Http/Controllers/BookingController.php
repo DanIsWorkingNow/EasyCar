@@ -66,7 +66,7 @@ class BookingController extends Controller
     {
         $this->authorize('view', $booking);
 
-        $booking->load(['cars.branch', 'payments' => fn ($q) => $q->latest()->with('invoices'), 'inspections', 'charges', 'user.driverProfile', 'addons', 'promoCode', 'reviews']);
+        $booking->load(['cars.branch', 'payments' => fn ($q) => $q->latest()->with('invoices'), 'inspections', 'charges', 'user.driverProfile', 'addons', 'promoCode', 'reviews', 'deposit']);
 
         return view('bookings.show', [
             'booking' => $booking,

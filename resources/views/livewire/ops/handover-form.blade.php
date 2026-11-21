@@ -204,6 +204,25 @@
                     </section>
                 @endif
 
+                @if ($this->depositDue)
+                    <section class="card card-pad border-sky-500/30">
+                        <h2 class="flex items-center gap-2 font-semibold"><x-icon name="shield" class="text-sky-300" /> Security deposit</h2>
+                        <p class="mt-1 text-sm text-mute">Take a refundable deposit of <span class="font-semibold text-white">RM {{ number_format($booking->deposit_amount, 2) }}</span>. It's released, or used for any extra charges, after the return.</p>
+                        @error('deposit')<p class="field-error">{{ $message }}</p>@enderror
+                        <div class="mt-4 space-y-3">
+                            <div>
+                                <label class="label" for="depositMethod">Taken by</label>
+                                <select id="depositMethod" wire:model="depositMethod" class="input @error('depositMethod') input-error @enderror">
+                                    <option value="">Choose…</option>
+                                    @foreach (config('pricing.deposit.methods') as $value => $label)<option value="{{ $value }}">{{ $label }}</option>@endforeach
+                                </select>
+                                @error('depositMethod')<p class="field-error">{{ $message }}</p>@enderror
+                            </div>
+                            <x-field name="depositReference" label="Pre-auth / receipt code (optional)" wire:model="depositReference" />
+                        </div>
+                    </section>
+                @endif
+
                 <section class="card card-pad">
                     <h2 class="font-semibold">Customer sign-off</h2>
 

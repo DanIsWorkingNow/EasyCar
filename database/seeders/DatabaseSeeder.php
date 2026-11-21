@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             RolesAndPermissionsSeeder::class,
             CustomerExperienceSeeder::class,
+            PricingDemoSeeder::class,
         ]);
     }
 }

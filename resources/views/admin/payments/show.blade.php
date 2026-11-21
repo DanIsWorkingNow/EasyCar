@@ -24,7 +24,7 @@
                     <div><dt class="label">Documents</dt><dd class="flex flex-wrap gap-2 text-sm">@forelse ($payment->invoices as $doc)<a href="{{ route('invoices.show', $doc) }}" class="underline">{{ $doc->number }}</a>@empty<span class="text-subtle">—</span>@endforelse</dd></div>
                     <div><dt class="label">Internal ID</dt><dd class="font-mono text-xs break-all">{{ $payment->uuid }}</dd></div>
                     @if ($payment->gateway === 'counter')
-                        <div><dt class="label">Taken at counter</dt><dd class="text-sm">{{ \App\Payments\Gateways\CounterGateway::METHODS[$payment->meta['method'] ?? ''] ?? '—' }} · by {{ $payment->meta['recorded_by_name'] ?? 'staff' }}</dd></div>
+                        <div><dt class="label">Taken at counter</dt><dd class="text-sm">{{ \App\Payments\Gateways\CounterGateway::methodLabel($payment->meta['method'] ?? null) ?: '—' }} · by {{ $payment->meta['recorded_by_name'] ?? 'staff' }}</dd></div>
                     @endif
                     <div><dt class="label">Paid at</dt><dd>{{ $payment->paid_at?->format('d M Y, g:i:s A') ?? '—' }}</dd></div>
                     <div><dt class="label">Refunded</dt><dd>{{ $payment->refunded_amount > 0 ? $payment->currency.' '.number_format($payment->refunded_amount, 2).' on '.$payment->refunded_at?->format('d M Y') : '—' }}</dd></div>

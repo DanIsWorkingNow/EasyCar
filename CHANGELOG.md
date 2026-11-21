@@ -7,6 +7,52 @@ Commit hashes refer to `main`.
 
 ## [Unreleased] — 2026-11-20
 
+### SIT — System Integration Testing
+
+### Added
+- SIT environment (`deploy/sit/`, `.env.sit`, `database/sit.sqlite`) with
+  `SitScenarioSeeder`, and a 47-case end-to-end browser pack
+  (`tests/SIT/sit-pack.cjs`) covering storefront, accounts, KYC, booking,
+  payments, approvals, operations and deposits, pricing and rewards,
+  customer experience, consoles, API and email. See `docs/SIT.md`.
+
+### Fixed
+- **DEF-01 (High):** editing a customer in Admin → Users silently promoted
+  them to Staff (the role list had no Customer option). The form now offers
+  Customer, pre-selects the user's actual role, and accepts it.
+- Pricing rules list labels day-of-week rules correctly.
+
+### Phase 5 — Pricing & revenue
+
+### Added
+- **Dynamic pricing:** seasonal (date range) and day-of-week rules, as a
+  ±% on the base rate, optionally per car type or branch, with priorities.
+  Every booking, quote and API price goes through `PricingService`; the
+  booking flow explains adjustments per car. **Admin → Pricing** manages
+  rules and previews daily rates for the next 5 weeks.
+- **Weekly & monthly rates:** 10% off 7+ days and 20% off 28+ days by
+  default (`PRICING_WEEKLY_DISCOUNT`, `PRICING_MONTHLY_DISCOUNT`), shown on
+  car pages.
+- **Security deposits:** per-car override, per-type and default amounts
+  (`config/pricing.php`), snapshotted on the booking and shown to the
+  customer. The handover form requires recording the deposit at the first
+  pick-up; after the return staff release it, or use it to settle the extra
+  charges (recorded as a counter payment "From security deposit", invoiced
+  as usual) and release the rest.
+- **EasyCar Rewards:** points ledger (`loyalty_transactions`). Points are
+  earned on completion, redeemed in the booking flow ("Use N points") or
+  API (`use_points`), returned when a booking is cancelled/rejected or
+  re-priced lower, and adjustable by admins on the user page. Customers see
+  balance and history at `/rewards`; invoices show the points discount; the
+  return email mentions points earned.
+- Demo pricing rules (weekend +10%, year-end +20%, midweek hatchback −10%)
+  in the demo seeder only — never added to existing installs.
+
+### Changed
+- `bookings.total_price` = rental + extras − promo discount − points.
+- Booking pages and the API expose `points_redeemed`, `points_discount`
+  and `deposit_amount`.
+
 ### Phase 4 — Customer experience
 
 ### Added

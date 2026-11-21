@@ -88,6 +88,9 @@
                             <a href="{{ route($user->consoleRoute()) }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-mute hover:bg-white/5 hover:text-white"><x-icon name="grid" class="size-4" /> {{ $user->isAdmin() ? 'Admin console' : 'Staff console' }}</a>
                         @endif
                         <a href="{{ route('bookings.index') }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-mute hover:bg-white/5 hover:text-white"><x-icon name="calendar" class="size-4" /> My bookings</a>
+                        @if (config('pricing.loyalty.enabled'))
+                            <a href="{{ route('rewards.index') }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-mute hover:bg-white/5 hover:text-white"><x-icon name="star" class="size-4" /> Rewards <span class="ml-auto text-xs font-semibold text-amber-300">{{ number_format($user->pointsBalance()) }} pts</span></a>
+                        @endif
                         <a href="{{ route('verification.show') }}" class="flex items-center gap-3 px-4 py-2.5 text-sm text-mute hover:bg-white/5 hover:text-white"><x-icon name="shield" class="size-4" /> Driver verification
                             @if ($user->driverProfile?->isVerified())<span class="ml-auto badge badge-success">Verified</span>@elseif (! $user->driverProfile)<span class="ml-auto badge badge-warning">To do</span>@endif
                         </a>

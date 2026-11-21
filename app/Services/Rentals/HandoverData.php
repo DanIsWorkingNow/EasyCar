@@ -15,6 +15,7 @@ final readonly class HandoverData
      * @param  UploadedFile[]  $photos
      * @param  string|null  $signature  PNG data URL from the signature pad
      * @param  array{method: string, reference: ?string}|null  $counterPayment  money taken at the desk
+     * @param  array{method: string, reference: ?string}|null  $deposit  security deposit taken at pick-up
      */
     public function __construct(
         public int $odometer,
@@ -26,5 +27,6 @@ final readonly class HandoverData
         public ?string $signature = null,
         public ?string $signedByName = null,
         public ?array $counterPayment = null,
+        public ?array $deposit = null,
     ) {}
 }
